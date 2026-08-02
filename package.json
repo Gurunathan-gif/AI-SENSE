@@ -1,0 +1,16 @@
+{
+  "name": "ai-sense-workspace",
+  "version": "1.0.0",
+  "description": "AI SENSE Hardware Platform - Root Workspace Configuration for VS Code",
+  "private": true,
+  "scripts": {
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "start:backend": "cd backend && node server.js",
+    "start:frontend": "cd frontend && npm run dev",
+    "dev": "concurrently \"npm run start:backend\" \"npm run start:frontend\"",
+    "build:frontend": "cd frontend && npm run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}

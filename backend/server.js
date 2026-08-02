@@ -1,0 +1,67 @@
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import connectDB from "./config/db.js";
+
+import authRoutes from "./routes/authRoutes.js";
+import aiRoutes from "./routes/aiRoutes.js";
+import projectRoutes from "./routes/projectRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
+
+dotenv.config();
+
+const app = express();
+
+// Connect MongoDB
+connectDB();
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Test Route
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "AI SENSE Backend Running..."
+  });
+});
+
+// API Routes
+app.use("/api/auth", authRoutes);
+app.use("/api/ai", aiRoutes);
+app.use("/api/projects", projectRoutes);
+app.use("/api/upload", uploadRoutes);
+
+// 404 Handler
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: "Route Not Found"
+  });
+});
+
+// Server with EADDRINUSE handling
+const PORT = parseInt(process.env.PORT, 10) || 5000;
+
+function startServer(portToUse) {
+  const server = app.listen(portToUse, () => {
+    console.log(`=================================================`);
+    console.log(`🚀 AI SENSE Backend Server running on port ${portToUse}`);
+    console.log(`📡 Health Check: http://localhost:${portToUse}/`);
+    console.log(`🤖 AI Route: POST http://localhost:${portToUse}/api/ai/generate`);
+    console.log(`=================================================`);
+  });
+
+  server.on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.warn(`\n⚠️ Port ${portToUse} is already in use.`);
+      console.warn(` Attempting to start server on port ${portToUse + 1}...\n`);
+      startServer(portToUse + 1);
+    } else {
+      console.error('Fatal Server Error:', err);
+    }
+  });
+}
+
+startServer(PORT);
