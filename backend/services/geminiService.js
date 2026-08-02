@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 // Universal Deep Sensor Synthesizer for ANY sensor / actuator / combination prompt
 export function synthesizeCustomSensorCode(prompt) {
   const lp = prompt.toLowerCase();
@@ -202,10 +200,17 @@ export async function generateResponse(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey && apiKey.trim() !== "") {
     try {
-      const { GoogleGenerativeAI } = await import("@google/generative-ai");
-      const client = new GoogleGenerativeAI(apiKey);
-      const model = client.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
-      const systemPrompt = `You are AI SENSE, an expert AI embedded systems engineer specializing in Arduino C++.
+      let GoogleGenAIModule;
+      try {
+        GoogleGenAIModule = await import("@google/genai");
+      } catch (e) {
+        GoogleGenAIModule = await import("@google/generative-ai");
+      }
+      const GoogleGenAI = GoogleGenAIModule.GoogleGenAI || GoogleGenAIModule.GoogleGenerativeAI;
+      const client = new GoogleGenAI({ apiKey });
+      const response = await client.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: `You are AI SENSE, an expert AI embedded systems engineer specializing in Arduino C++.
 Generate EXACT, fully working, compilable Arduino C++ code and circuit wiring for ANY user prompt: "${prompt}".
 Respond ONLY with a valid JSON object:
 {
@@ -214,9 +219,9 @@ Respond ONLY with a valid JSON object:
   "wiring": ["Wire instruction 1", "Wire instruction 2"],
   "code": "// Compilable Arduino C++ code with Serial.print TELEMETRY|...",
   "explanation": ["Step 1", "Step 2"]
-}`;
-      const result = await model.generateContent(systemPrompt);
-      let text = result.response.text().trim();
+}`
+      });
+      let text = (response.text || response.response?.text() || "").trim();
       if (text.startsWith("```json")) text = text.replace(/^```json/, "");
       if (text.startsWith("```")) text = text.replace(/^```/, "");
       if (text.endsWith("```")) text = text.replace(/```$/, "");
