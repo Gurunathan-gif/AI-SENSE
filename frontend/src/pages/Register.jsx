@@ -29,17 +29,20 @@ export default function Register() {
     try {
       setLoading(true);
 
-      await registerUser({
+      const res = await registerUser({
         name,
         email,
         password,
       });
 
-      alert("Registration Successful!");
+      if (res.token) localStorage.setItem("token", res.token);
+      if (res.user) localStorage.setItem("user", JSON.stringify(res.user));
 
-      navigate("/login");
+      alert("Registration Successful!");
+      navigate("/dashboard");
     } catch (err) {
       alert(
+        err.message ||
         err.response?.data?.message ||
           "Registration Failed"
       );
