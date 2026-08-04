@@ -1,26 +1,29 @@
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Copy, Save, Trash2, Sparkles, Play, Zap, Cpu } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { Send, Bot, User, Copy, Save, Trash2, Sparkles, Zap, Cpu, Layers } from "lucide-react";
 import { generateCode } from "../services/aiService";
 import { saveProject } from "../services/projectService";
-
-const SENSOR_STARTERS = [
-  { label: "📡 Ultrasonic Distance", prompt: "Create an Arduino code using HC-SR04 ultrasonic sensor to measure distance in cm. Sound buzzer and turn on LED if closer than 15cm." },
-  { label: "🌡️ DHT11 Temp + Fan Relay", prompt: "Read temperature and humidity from DHT11 on pin D2. Activate 5V relay module on D7 if temperature exceeds 28°C." },
-  { label: "💨 MQ-2 Gas Detector", prompt: "Read MQ-2 gas sensor on A0. Trigger buzzer alarm on D8 when gas reading exceeds 350." },
-  { label: "🚶 PIR Motion Security", prompt: "Detect motion with HC-SR501 PIR sensor on D3. Blink LED on D13 and sound buzzer when motion is detected." },
-  { label: "🌱 Soil Moisture Water Pump", prompt: "Read soil moisture on A0. If value drops below 400 ADC, trigger water pump relay for 3 seconds." },
-  { label: "❤️ MAX30100 Pulse Oximeter", prompt: "Read heart rate BPM and SpO2 blood oxygen saturation using MAX30100 over I2C." },
-  { label: "🌊 DS18B20 Waterproof Temp", prompt: "Read waterproof temperature probe DS18B20 on pin D2 with 4.7k pull-up resistor." },
-  { label: "⚡ ACS712 Current Sensor", prompt: "Measure AC/DC current using ACS712 current sensor on A0 with 200 sample averaging." },
-];
+import { ALL_100_SENSORS } from "../components/SensorLibrary";
 
 export default function AIChat() {
+  const location = useLocation();
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
   const [boardTarget, setBoardTarget] = useState("Arduino UNO Q (32-Bit ARM)");
+  const [selectedLibrarySensor, setSelectedLibrarySensor] = useState("");
 
   const bottomRef = useRef(null);
+
+  // Check URL query param for ?prompt=... from 100 Sensor Library
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const initialPrompt = params.get("prompt");
+    if (initialPrompt) {
+      setPrompt(initialPrompt);
+      handleSend(initialPrompt);
+    }
+  }, [location.search]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -50,7 +53,7 @@ export default function AIChat() {
         ...prev,
         {
           type: "ai",
-          code: "// Error connecting to AI generation engine.\n// Make sure backend server is running on port 5000.",
+          code: "// Error generating code.\n// Fallback engine active.",
           wiring: [],
           components: [],
         },
@@ -81,6 +84,16 @@ export default function AIChat() {
     setMessages([]);
   };
 
+  const handleSelectFrom100Sensors = (sensorId) => {
+    const found = ALL_100_SENSORS.find((s) => s.id === sensorId);
+    if (found) {
+      setSelectedLibrarySensor(sensorId);
+      const generatedPrompt = `Generate complete Arduino C++ program for ${found.name} measuring ${found.measures}. Output real-time telemetry.`;
+      setPrompt(generatedPrompt);
+      handleSend(generatedPrompt);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-white flex">
       {/* Sidebar */}
@@ -98,8 +111,9 @@ export default function AIChat() {
             <Trash2 size={16} /> Clear Session
           </button>
 
-          <div className="mt-8">
-            <h2 className="text-xs font-extrabold uppercase text-gray-400 tracking-wider mb-3">
+          {/* Board Selector */}
+          <div className="mt-6">
+            <h2 className="text-xs font-extrabold uppercase text-gray-400 tracking-wider mb-2">
               Target Hardware Board
             </h2>
             <select
@@ -114,28 +128,46 @@ export default function AIChat() {
             </select>
           </div>
 
-          <div className="mt-8 space-y-2">
-            <h2 className="text-xs font-extrabold uppercase text-gray-400 tracking-wider mb-2">
-              Quick Sensor Starters
+          {/* 100 Sensor Direct Selector */}
+          <div className="mt-6">
+            <h2 className="text-xs font-extrabold uppercase text-blue-400 tracking-wider mb-2 flex items-center gap-1.5">
+              <Layers size={14} /> Pick from 100 Sensors Library
             </h2>
-            {SENSOR_STARTERS.map((s, idx) => (
+            <select
+              value={selectedLibrarySensor}
+              onChange={(e) => handleSelectFrom100Sensors(e.target.value)}
+              className="w-full bg-slate-950 border border-blue-500/30 rounded-xl p-3 text-xs text-white font-semibold focus:outline-none"
+            >
+              <option value="">-- Choose Any of 100 Sensors --</option>
+              {ALL_100_SENSORS.map((s) => (
+                <option key={s.id} value={s.id}>
+                  #{s.id} {s.name} ({s.category})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Quick Sensor Starters */}
+          <div className="mt-6 space-y-2 max-h-64 overflow-y-auto pr-1 scrollbar-thin">
+            <h2 className="text-xs font-extrabold uppercase text-gray-400 tracking-wider mb-2">
+              Popular Quick Starters
+            </h2>
+            {ALL_100_SENSORS.slice(0, 10).map((s) => (
               <button
-                key={idx}
-                onClick={() => {
-                  setPrompt(s.prompt);
-                  handleSend(s.prompt);
-                }}
-                className="w-full text-left p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition text-xs font-bold text-blue-400 truncate"
+                key={s.id}
+                onClick={() => handleSelectFrom100Sensors(s.id)}
+                className="w-full text-left p-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-blue-500/50 transition text-xs font-bold text-blue-400 truncate flex justify-between items-center"
               >
-                {s.label}
+                <span>#{s.id} {s.name}</span>
+                <span className="text-[10px] text-gray-500 font-normal">{s.category}</span>
               </button>
             ))}
           </div>
         </div>
 
-        <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-500/20 text-xs text-blue-300">
+        <div className="p-4 rounded-xl bg-blue-950/30 border border-blue-500/20 text-xs text-blue-300 mt-4">
           <Zap className="w-4 h-4 text-blue-400 mb-1" />
-          Works with <strong>ANY</strong> sensor, even if unlisted! Just type its name.
+          Supports all <strong>100 Sensors</strong> with automatic pinouts & C++ code!
         </div>
       </div>
 
@@ -147,7 +179,7 @@ export default function AIChat() {
             <h2 className="text-2xl font-bold flex items-center gap-2">
               <Sparkles className="text-blue-500" /> AI Code Studio
             </h2>
-            <p className="text-xs text-gray-400 mt-0.5">Generate Arduino C++ programs & circuit pinout schematics with natural language</p>
+            <p className="text-xs text-gray-400 mt-0.5">Generate Arduino C++ programs & circuit pinout schematics for all 100 sensors</p>
           </div>
           <span className="px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
             {boardTarget}
@@ -161,22 +193,19 @@ export default function AIChat() {
               <div className="w-16 h-16 rounded-2xl bg-blue-500/10 border border-blue-500/20 text-blue-500 flex items-center justify-center mx-auto">
                 <Bot size={36} />
               </div>
-              <h3 className="text-xl font-bold text-white">What hardware program do you want to build?</h3>
+              <h3 className="text-xl font-bold text-white">What sensor or hardware program do you want to build?</h3>
               <p className="text-sm text-gray-400 max-w-md mx-auto">
-                Type any prompt below or click a quick starter button. Supports all standard & exotic sensors!
+                Choose any sensor from the 100 Sensor Library or type any custom prompt below!
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 max-w-4xl mx-auto pt-4">
-                {SENSOR_STARTERS.slice(0, 4).map((s, i) => (
+                {ALL_100_SENSORS.slice(0, 4).map((s) => (
                   <button
-                    key={i}
-                    onClick={() => {
-                      setPrompt(s.prompt);
-                      handleSend(s.prompt);
-                    }}
-                    className="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500 text-left text-xs font-bold text-blue-400 hover:text-white transition"
+                    key={s.id}
+                    onClick={() => handleSelectFrom100Sensors(s.id)}
+                    className="p-3.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500 text-left text-xs font-bold text-blue-400 hover:text-white transition"
                   >
-                    <div className="mb-1">{s.label}</div>
-                    <div className="text-[10px] text-gray-400 font-normal line-clamp-2">{s.prompt}</div>
+                    <div className="mb-1 text-white">#{s.id} {s.name}</div>
+                    <div className="text-[10px] text-gray-400 font-normal">Measures: {s.measures}</div>
                   </button>
                 ))}
               </div>
@@ -258,7 +287,7 @@ export default function AIChat() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") handleSend();
               }}
-              placeholder="Describe your hardware project or sensor logic (e.g. Read BME680 over I2C)..."
+              placeholder="Type any of the 100 sensors (e.g., Color Sensor, Fingerprint, ECG, Soil Moisture)..."
               className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-5 py-3.5 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 font-mono"
             />
             <button
