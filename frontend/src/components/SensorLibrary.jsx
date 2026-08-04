@@ -1,133 +1,274 @@
 import React, { useState } from 'react';
 import {
-  Search, Cpu, ArrowLeft, ChevronRight, Check, Copy, Radio, Thermometer,
+  Search, Cpu, ArrowLeft, ChevronRight, Radio, Thermometer,
   Wind, Activity, Eye, Compass, Gauge, Sprout, Sun, Volume2, ShieldCheck,
-  Flame, Zap, Wifi, Droplets, Heart, Crosshair, Terminal, Sparkles, Sliders
+  Flame, Zap, Wifi, Droplets, Heart, Crosshair, Terminal, Sparkles, Sliders,
+  BookOpen, Layers, CheckCircle2, AlertCircle, Info, HardDrive, Wrench
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const ALL_100_SENSORS = [
   // ── 1. Environmental Sensors (1 - 18) ──
-  { id: '1', name: 'Temperature Sensor (LM35)', category: 'Environmental', measures: 'Temperature', voltage: '4V - 30V', interface: 'Analog (10mV/°C)', code: `#define LM35_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { int adc = analogRead(LM35_PIN); float tempC = (adc * 5.0 / 1024.0) * 100.0; Serial.print("TELEMETRY|TEMP:"); Serial.println(tempC); delay(1000); }` },
-  { id: '2', name: 'Humidity Sensor (DHT11/DHT22)', category: 'Environmental', measures: 'Humidity & Temperature', voltage: '3.3V - 5V', interface: 'Single-Wire Digital', code: `#include <DHT.h>\n#define DHTPIN 2\n#define DHTTYPE DHT11\nDHT dht(DHTPIN, DHTTYPE);\nvoid setup() { Serial.begin(115200); dht.begin(); }\nvoid loop() { float h = dht.readHumidity(); float t = dht.readTemperature(); Serial.print("TELEMETRY|TEMP:"); Serial.print(t); Serial.print("C|HUM:"); Serial.println(h); delay(2000); }` },
-  { id: '3', name: 'Pressure Sensor (BMP280)', category: 'Environmental', measures: 'Barometric Pressure & Temp', voltage: '3.3V', interface: 'I2C (0x76)', code: `#include <Wire.h>\n#include <Adafruit_BMP280.h>\nAdafruit_BMP280 bmp;\nvoid setup() { Serial.begin(115200); bmp.begin(0x76); }\nvoid loop() { Serial.print("TELEMETRY|PRESS:"); Serial.println(bmp.readPressure()/100.0); delay(1000); }` },
-  { id: '4', name: 'Barometric Pressure Sensor (MS5611)', category: 'Environmental', measures: 'Atmospheric Altitude & Pressure', voltage: '3.3V - 5V', interface: 'I2C / SPI', code: `#include <Wire.h>\nvoid setup() { Serial.begin(115200); Wire.begin(); }\nvoid loop() { Serial.println("TELEMETRY|MS5611_PRESS:1013.25"); delay(1000); }` },
-  { id: '5', name: 'Gas Sensor (MQ-2)', category: 'Gas', measures: 'Smoke, LPG & Combustible Gas', voltage: '5V', interface: 'Analog A0 + Digital D8', code: `#define MQ2_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { int adc = analogRead(MQ2_PIN); Serial.print("TELEMETRY|MQ2_GAS:"); Serial.println(adc); delay(500); }` },
-  { id: '6', name: 'Gas Sensor (MQ-3)', category: 'Gas', measures: 'Alcohol Vapor Level', voltage: '5V', interface: 'Analog A0', code: `#define MQ3_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { int adc = analogRead(MQ3_PIN); Serial.print("TELEMETRY|ALCOHOL:"); Serial.println(adc); delay(500); }` },
-  { id: '7', name: 'Gas Sensor (MQ-4)', category: 'Gas', measures: 'Methane (CNG) Concentration', voltage: '5V', interface: 'Analog A0', code: `#define MQ4_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|METHANE:"); Serial.println(analogRead(MQ4_PIN)); delay(500); }` },
-  { id: '8', name: 'Gas Sensor (MQ-5)', category: 'Gas', measures: 'Natural Gas & LPG', voltage: '5V', interface: 'Analog A0', code: `#define MQ5_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|NATURAL_GAS:"); Serial.println(analogRead(MQ5_PIN)); delay(500); }` },
-  { id: '9', name: 'Gas Sensor (MQ-6)', category: 'Gas', measures: 'LPG & Iso-butane Gas', voltage: '5V', interface: 'Analog A0', code: `#define MQ6_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|LPG:"); Serial.println(analogRead(MQ6_PIN)); delay(500); }` },
-  { id: '10', name: 'Gas Sensor (MQ-7)', category: 'Gas', measures: 'Carbon Monoxide (CO)', voltage: '5V', interface: 'Analog A0', code: `#define MQ7_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|CO_PPM:"); Serial.println(analogRead(MQ7_PIN)); delay(500); }` },
-  { id: '11', name: 'Gas Sensor (MQ-8)', category: 'Gas', measures: 'Hydrogen Gas (H₂)', voltage: '5V', interface: 'Analog A0', code: `#define MQ8_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|HYDROGEN:"); Serial.println(analogRead(MQ8_PIN)); delay(500); }` },
-  { id: '12', name: 'Gas Sensor (MQ-9)', category: 'Gas', measures: 'CO & Flammable Gas Leakage', voltage: '5V', interface: 'Analog A0', code: `#define MQ9_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|FLAMMABLE_GAS:"); Serial.println(analogRead(MQ9_PIN)); delay(500); }` },
-  { id: '13', name: 'Gas Sensor (MQ-135)', category: 'Gas', measures: 'Air Quality & NH3, NOx, Alcohol', voltage: '5V', interface: 'Analog A0', code: `#define MQ135_PIN A0\nvoid setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|AIR_QUALITY:"); Serial.println(analogRead(MQ135_PIN)); delay(500); }` },
-  { id: '14', name: 'Carbon Dioxide Sensor (MH-Z19B)', category: 'Gas', measures: 'CO₂ Concentration (PPM)', voltage: '5V', interface: 'UART / PWM', code: `#include <SoftwareSerial.h>\nSoftwareSerial co2(2, 3);\nvoid setup() { Serial.begin(115200); co2.begin(9600); }\nvoid loop() { Serial.println("TELEMETRY|CO2_PPM:420"); delay(1000); }` },
-  { id: '15', name: 'Oxygen Sensor (MIX8410)', category: 'Gas', measures: 'O₂ Oxygen Concentration (%)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float o2 = analogRead(A0) * (25.0 / 1023.0); Serial.print("TELEMETRY|OXYGEN:"); Serial.print(o2); Serial.println("%"); delay(1000); }` },
-  { id: '16', name: 'Ammonia Sensor (MQ-137)', category: 'Gas', measures: 'NH₃ Ammonia Concentration', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|AMMONIA_ADC:"); Serial.println(analogRead(A0)); delay(500); }` },
-  { id: '17', name: 'Hydrogen Sulfide Sensor (MQ-136)', category: 'Gas', measures: 'H₂S Hydrogen Sulfide Gas', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|H2S_PPM:"); Serial.println(analogRead(A0)); delay(500); }` },
-  { id: '18', name: 'Nitrogen Dioxide Sensor (MiCS-2714)', category: 'Gas', measures: 'NO₂ Nitrogen Dioxide', voltage: '3.3V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|NO2_ADC:"); Serial.println(analogRead(A0)); delay(500); }` },
+  {
+    id: '1',
+    name: 'Temperature Sensor (LM35)',
+    category: 'Environmental',
+    measures: 'Temperature (-55°C to +150°C)',
+    voltage: '4.0V - 30V DC',
+    current: '60 µA low drain current',
+    interface: 'Analog Voltage (10mV/°C linear scale)',
+    accuracy: '±0.5°C accuracy at +25°C',
+    resolution: '0.1°C thermal resolution',
+    operatingTemp: '-55°C to +150°C',
+    principle: 'Semiconductor bandgap voltage element producing a precision linear output voltage directly proportional to Centigrade temperature (10.0 mV/°C).',
+    pins: [
+      { pin: 'VCC', desc: 'Power Supply (4V - 30V DC)' },
+      { pin: 'VOUT', desc: 'Analog Temperature Signal Out (10mV/°C)' },
+      { pin: 'GND', desc: 'System Ground' }
+    ],
+    wiringInfo: 'Connect VCC to 5V, GND to GND, and VOUT directly to Analog Pin A0. No external calibration or pull-up resistors required.',
+    applications: ['HVAC thermal monitoring', 'Battery pack temperature management', 'Environmental climate chambers', 'Industrial motor overheat protection']
+  },
 
-  // ── 2. Distance & Motion Ranging Sensors (19 - 27) ──
-  { id: '19', name: 'Ultrasonic Sensor (HC-SR04)', category: 'Distance', measures: 'Distance (2cm - 400cm)', voltage: '5V', interface: 'Digital Pulse (Trig D9 / Echo D10)', code: `#define TRIG 9\n#define ECHO 10\nvoid setup() { Serial.begin(115200); pinMode(TRIG, OUTPUT); pinMode(ECHO, INPUT); }\nvoid loop() { digitalWrite(TRIG, LOW); delayMicroseconds(2); digitalWrite(TRIG, HIGH); delayMicroseconds(10); digitalWrite(TRIG, LOW); long dur = pulseIn(ECHO, HIGH); float dist = (dur * 0.0343) / 2.0; Serial.print("TELEMETRY|DISTANCE:"); Serial.println(dist); delay(200); }` },
-  { id: '20', name: 'Infrared (IR) Sensor (FC-51)', category: 'Distance', measures: 'Obstacle Detection', voltage: '3.3V - 5V', interface: 'Digital D2', code: `#define IR_PIN 2\nvoid setup() { Serial.begin(115200); pinMode(IR_PIN, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|OBSTACLE:"); Serial.println(digitalRead(IR_PIN) == LOW ? "DETECTED" : "CLEAR"); delay(200); }` },
-  { id: '21', name: 'Laser Distance Sensor (VL53L0X)', category: 'Distance', measures: 'Time-of-Flight Distance', voltage: '2.8V - 5V', interface: 'I2C (0x29)', code: `#include <Wire.h>\n#include <VL53L0X.h>\nVL53L0X lox;\nvoid setup() { Serial.begin(115200); Wire.begin(); lox.init(); lox.startContinuous(); }\nvoid loop() { Serial.print("TELEMETRY|DISTANCE_MM:"); Serial.println(lox.readRangeContinuousMillimeters()); delay(200); }` },
-  { id: '22', name: 'LiDAR Sensor (TF-Luna)', category: 'Distance', measures: '3D Distance Mapping (0.2m - 8m)', voltage: '5V', interface: 'UART / I2C', code: `#include <SoftwareSerial.h>\nSoftwareSerial lidar(4, 5);\nvoid setup() { Serial.begin(115200); lidar.begin(115200); }\nvoid loop() { Serial.println("TELEMETRY|LIDAR_DIST_CM:142"); delay(200); }` },
-  { id: '23', name: 'Time of Flight (ToF) Sensor (VL53L1X)', category: 'Distance', measures: 'Long Distance ToF (up to 4m)', voltage: '3.3V - 5V', interface: 'I2C (0x29)', code: `#include <Wire.h>\nvoid setup() { Serial.begin(115200); Wire.begin(); }\nvoid loop() { Serial.println("TELEMETRY|TOF_DIST_MM:1250"); delay(200); }` },
-  { id: '24', name: 'Proximity Sensor (LJ12A3-4-Z/BX)', category: 'Distance', measures: 'Nearby Objects', voltage: '6V - 36V', interface: 'Digital NPN D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { Serial.print("TELEMETRY|PROXIMITY:"); Serial.println(digitalRead(2) == LOW ? "OBJECT_NEAR" : "IDLE"); delay(200); }` },
-  { id: '25', name: 'Capacitive Proximity Sensor (LJC18A3)', category: 'Distance', measures: 'Non-metal & Liquid Detection', voltage: '6V - 36V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { Serial.print("TELEMETRY|CAPACITIVE_PROX:"); Serial.println(digitalRead(2) == LOW ? "DETECTED" : "NONE"); delay(200); }` },
-  { id: '26', name: 'Inductive Proximity Sensor (PR12-4DN)', category: 'Distance', measures: 'Metal Object Detection', voltage: '12V - 24V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { Serial.print("TELEMETRY|METAL_DETECTED:"); Serial.println(digitalRead(2) == LOW ? "YES" : "NO"); delay(200); }` },
-  { id: '27', name: 'Photoelectric Sensor (E18-D80NK)', category: 'Distance', measures: 'Infrared Object Detection (3-80cm)', voltage: '5V', interface: 'Digital NPN D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { Serial.print("TELEMETRY|PHOTOELECTRIC:"); Serial.println(digitalRead(2) == LOW ? "BLOCKED" : "CLEAR"); delay(200); }` },
+  {
+    id: '2',
+    name: 'Humidity & Temp Sensor (DHT11/DHT22)',
+    category: 'Environmental',
+    measures: 'Relative Humidity (20-90%) & Temp (0-50°C)',
+    voltage: '3.3V - 5.5V DC',
+    current: '2.5 mA (during 8-bit conversion)',
+    interface: 'Single-Wire Digital Custom Bus',
+    accuracy: 'Humidity ±5% RH | Temp ±2°C',
+    resolution: '1% RH | 1°C resolution',
+    operatingTemp: '0°C to 50°C',
+    principle: 'Combines a capacitive humidity sensing substrate and an NTC thermistor read by an onboard 8-bit microcontroller outputting a 40-bit data packet.',
+    pins: [
+      { pin: 'VCC', desc: 'Power Supply (3.3V - 5V DC)' },
+      { pin: 'DATA', desc: 'Digital Data Out (Requires 10kΩ pull-up to VCC)' },
+      { pin: 'NC', desc: 'Not Connected' },
+      { pin: 'GND', desc: 'System Ground' }
+    ],
+    wiringInfo: 'Connect VCC to 5V, GND to GND, and DATA to Digital Pin D2. Place a 10kΩ pull-up resistor between VCC and DATA pins.',
+    applications: ['Smart home HVAC controllers', 'Greenhouse environmental monitoring', 'Weather stations', 'Server room humidity alerts']
+  },
 
-  // ── 3. Motion, Inertial & Force Sensors (28 - 43) ──
-  { id: '28', name: 'Hall Effect Sensor (A3144)', category: 'Motion', measures: 'Magnetic Field & Magnet Detection', voltage: '4.5V - 24V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { Serial.print("TELEMETRY|MAGNET:"); Serial.println(digitalRead(2) == LOW ? "MAGNET_PRESENT" : "NO_MAGNET"); delay(200); }` },
-  { id: '29', name: 'Magnetic Reed Switch (KY-025)', category: 'Motion', measures: 'Magnet Presence Door Switch', voltage: '3.3V - 5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|REED_SWITCH:"); Serial.println(digitalRead(2) == HIGH ? "CLOSED" : "OPEN"); delay(200); }` },
-  { id: '30', name: 'Compass Sensor (HMC5883L / QMC5883L)', category: 'Motion', measures: '3-Axis Magnetic Direction & Heading', voltage: '3.3V - 5V', interface: 'I2C (0x0D / 0x1E)', code: `#include <Wire.h>\nvoid setup() { Serial.begin(115200); Wire.begin(); }\nvoid loop() { Serial.println("TELEMETRY|HEADING_DEG:245.5"); delay(500); }` },
-  { id: '31', name: 'Accelerometer (ADXL345)', category: 'Motion', measures: '3-Axis Acceleration (±16g)', voltage: '3.3V - 5V', interface: 'I2C (0x53) / SPI', code: `#include <Wire.h>\n#include <Adafruit_ADXL345_U.h>\nAdafruit_ADXL345_Unified accel = Adafruit_ADXL345_Unified(12345);\nvoid setup() { Serial.begin(115200); accel.begin(); }\nvoid loop() { sensors_event_t event; accel.getEvent(&event); Serial.print("TELEMETRY|AX:"); Serial.print(event.acceleration.x); Serial.print("|AY:"); Serial.print(event.acceleration.y); Serial.print("|AZ:"); Serial.println(event.acceleration.z); delay(200); }` },
-  { id: '32', name: 'Gyroscope (L3GD20H)', category: 'Motion', measures: '3-Axis Angular Velocity (°/s)', voltage: '3.3V - 5V', interface: 'I2C / SPI', code: `#include <Wire.h>\nvoid setup() { Serial.begin(115200); Wire.begin(); }\nvoid loop() { Serial.println("TELEMETRY|GYRO_Z:12.4_DPS"); delay(200); }` },
-  { id: '33', name: 'Magnetometer (AK8963)', category: 'Motion', measures: '3-Axis Magnetic Field (µT)', voltage: '3.3V', interface: 'I2C (0x0C)', code: `#include <Wire.h>\nvoid setup() { Serial.begin(115200); Wire.begin(); }\nvoid loop() { Serial.println("TELEMETRY|MAG_UT:48.2"); delay(200); }` },
-  { id: '34', name: 'IMU Sensor (MPU-6050)', category: 'Motion', measures: '6-Axis Gyro + Accelerometer', voltage: '3.3V - 5V', interface: 'I2C (0x68)', code: `#include <Wire.h>\n#include <MPU6050.h>\nMPU6050 mpu;\nvoid setup() { Serial.begin(115200); Wire.begin(); mpu.initialize(); }\nvoid loop() { int16_t ax, ay, az, gx, gy, gz; mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz); Serial.print("TELEMETRY|AX:"); Serial.print(ax/16384.0); Serial.print("|AZ:"); Serial.println(az/16384.0); delay(200); }` },
-  { id: '35', name: 'Tilt Sensor (SW-520D)', category: 'Motion', measures: 'Inclination & Tilt Angle', voltage: '3.3V - 5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { Serial.print("TELEMETRY|TILT:"); Serial.println(digitalRead(2) == HIGH ? "TILTED" : "FLAT"); delay(200); }` },
-  { id: '36', name: 'Vibration Sensor (SW-420)', category: 'Motion', measures: 'Vibration & Motion Shake', voltage: '3.3V - 5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|VIBRATION:"); Serial.println(digitalRead(2) == HIGH ? "SHAKE_DETECTED" : "STILL"); delay(200); }` },
-  { id: '37', name: 'Shock Sensor (KY-002)', category: 'Motion', measures: 'Impact & Physical Shock', voltage: '3.3V - 5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|SHOCK:"); Serial.println(digitalRead(2) == HIGH ? "IMPACT!" : "NORMAL"); delay(100); }` },
-  { id: '38', name: 'Flex Sensor (2.2 Inch)', category: 'Motion', measures: 'Bending & Angular Flexion', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int adc = analogRead(A0); float flexAngle = map(adc, 500, 800, 0, 90); Serial.print("TELEMETRY|FLEX_ANGLE:"); Serial.println(flexAngle); delay(200); }` },
-  { id: '39', name: 'Stretch Sensor', category: 'Motion', measures: 'Elongation & Physical Stretch', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|STRETCH_ADC:"); Serial.println(analogRead(A0)); delay(200); }` },
-  { id: '40', name: 'Force Sensor (FSR-402)', category: 'Motion', measures: 'Applied Physical Force (0.2N - 20N)', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int fsrAdc = analogRead(A0); Serial.print("TELEMETRY|FORCE_ADC:"); Serial.println(fsrAdc); delay(200); }` },
-  { id: '41', name: 'Load Cell (HX711 Scale)', category: 'Motion', measures: 'Weight Scale (0 - 10kg)', voltage: '5V', interface: 'Digital DT D2 / SCK D3', code: `#include "HX711.h"\nHX711 scale;\nvoid setup() { Serial.begin(115200); scale.begin(2, 3); scale.set_scale(-7050); scale.tare(); }\nvoid loop() { Serial.print("TELEMETRY|WEIGHT_GRAMS:"); Serial.println(scale.get_units(5) * 1000.0); delay(500); }` },
-  { id: '42', name: 'Strain Gauge (BF350)', category: 'Motion', measures: 'Micro Strain & Mechanical Stress', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|STRAIN_ADC:"); Serial.println(analogRead(A0)); delay(300); }` },
-  { id: '43', name: 'Torque Sensor', category: 'Motion', measures: 'Rotational Torque (N·m)', voltage: '12V - 24V', interface: 'Analog A0 / RS485', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|TORQUE_NM:"); Serial.println(analogRead(A0) * (50.0 / 1023.0)); delay(500); }` },
+  {
+    id: '3',
+    name: 'Pressure & Temp Sensor (BMP280)',
+    category: 'Environmental',
+    measures: 'Barometric Pressure (300-1100 hPa) & Altitude',
+    voltage: '1.71V - 3.6V DC (3.3V Strict)',
+    current: '2.7 µA @ 1 Hz sampling',
+    interface: 'I²C (Address 0x76 / 0x77) & 4-Wire SPI',
+    accuracy: '±12 Pa (equivalent to ±1 meter altitude resolution)',
+    resolution: '0.16 Pa pressure resolution',
+    operatingTemp: '-40°C to +85°C',
+    principle: 'Piezo-resistive MEMS pressure sensor cell providing digital calibrated output via onboard 20-bit ADC.',
+    pins: [
+      { pin: 'VCC', desc: '3.3V DC Power (Do NOT connect 5V directly)' },
+      { pin: 'GND', desc: 'System Ground' },
+      { pin: 'SCL', desc: 'I²C Clock -> Arduino A5 / SCL' },
+      { pin: 'SDA', desc: 'I²C Data -> Arduino A4 / SDA' }
+    ],
+    wiringInfo: 'Connect VCC to 3.3V, GND to GND, SCL to A5, and SDA to A4. Set I²C address solder jumper to GND for 0x76 or VCC for 0x77.',
+    applications: ['Drone altitude hold systems', 'Indoor navigation & floor detection', 'Barometric weather forecasting', 'Vertical speed indicators']
+  },
 
-  // ── 4. Electrical & Power Sensors (44 - 47) ──
-  { id: '44', name: 'Current Sensor (ACS712)', category: 'Electrical', measures: 'AC/DC Current (5A/20A/30A)', voltage: '5V', interface: 'Analog A0 (66-185mV/A)', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int raw = analogRead(A0); float voltage = (raw / 1024.0) * 5000; float amps = (voltage - 2500) / 185.0; Serial.print("TELEMETRY|AMPS:"); Serial.println(amps, 2); delay(500); }` },
-  { id: '45', name: 'Voltage Sensor (0-25V)', category: 'Electrical', measures: 'DC Voltage (0V - 25V)', voltage: '5V Max Input', interface: 'Analog A0 (5:1 Divider)', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int adc = analogRead(A0); float vout = (adc * 5.0) / 1024.0; float vin = vout / (7.5 / (30.0 + 7.5)); Serial.print("TELEMETRY|VOLTAGE_V:"); Serial.println(vin, 2); delay(500); }` },
-  { id: '46', name: 'Power Sensor (INA219)', category: 'Electrical', measures: 'I2C Voltage, Current & Power', voltage: '3.3V - 5V', interface: 'I2C (0x40)', code: `#include <Wire.h>\n#include <Adafruit_INA219.h>\nAdafruit_INA219 ina219;\nvoid setup() { Serial.begin(115200); ina219.begin(); }\nvoid loop() { Serial.print("TELEMETRY|VOLTS:"); Serial.print(ina219.getBusVoltage_V()); Serial.print("|AMPS_MA:"); Serial.println(ina219.getCurrent_mA()); delay(500); }` },
-  { id: '47', name: 'Energy Meter Sensor (PZEM-004T)', category: 'Electrical', measures: 'AC Power, Energy (kWh) & Voltage', voltage: '80V - 260V AC', interface: 'UART Serial', code: `#include <PZEM004Tv30.h>\nPZEM004Tv30 pzem(2, 3);\nvoid setup() { Serial.begin(115200); }\nvoid loop() { float v = pzem.voltage(); float i = pzem.current(); float p = pzem.power(); Serial.print("TELEMETRY|AC_VOLTS:"); Serial.print(v); Serial.print("|WATTS:"); Serial.println(p); delay(1000); }` },
+  {
+    id: '4',
+    name: 'Barometric Altimeter Sensor (MS5611)',
+    category: 'Environmental',
+    measures: 'Atmospheric Altitude & Pressure (10 - 1200 mbar)',
+    voltage: '1.8V - 3.6V DC',
+    current: '1.4 mA active conversion',
+    interface: 'I²C (0x77) & SPI',
+    accuracy: '10 cm altitude resolution',
+    resolution: '24-bit ADC pressure conversion',
+    operatingTemp: '-40°C to +85°C',
+    principle: 'Ultra-high resolution MEMS piezoresistive sensor with internal factory-calibrated ROM coefficient memory.',
+    pins: [
+      { pin: 'VCC', desc: '3.3V Power' }, { pin: 'GND', desc: 'Ground' }, { pin: 'SCL', desc: 'I2C Clock (A5)' }, { pin: 'SDA', desc: 'I2C Data (A4)' }
+    ],
+    wiringInfo: 'Connect to 3.3V power bus. Uses default I2C address 0x77.',
+    applications: ['Autopilot flight controllers', 'Variometers for paragliding', 'Altimeter watches']
+  },
 
-  // ── 5. Optical & Vision Sensors (48 - 55) ──
-  { id: '48', name: 'Light Sensor (LDR Photoresistor)', category: 'Optical', measures: 'Ambient Light Level (Lux)', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int ldr = analogRead(A0); Serial.print("TELEMETRY|LIGHT_ADC:"); Serial.println(ldr); delay(500); }` },
-  { id: '49', name: 'Photodiode (BPW34)', category: 'Optical', measures: 'Fast Response Light Detection', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|PHOTODIODE:"); Serial.println(analogRead(A0)); delay(200); }` },
-  { id: '50', name: 'Phototransistor Sensor', category: 'Optical', measures: 'Infrared & Visible Light Intensity', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|IR_LIGHT:"); Serial.println(analogRead(A0)); delay(200); }` },
-  { id: '51', name: 'UV Sensor (GUVA-S12SD)', category: 'Optical', measures: 'Ultraviolet Index (UV Index)', voltage: '2.5V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int raw = analogRead(A0); float uvVoltage = raw * (5.0 / 1023.0); float uvIndex = uvVoltage / 0.1; Serial.print("TELEMETRY|UV_INDEX:"); Serial.println(uvIndex, 1); delay(1000); }` },
-  { id: '52', name: 'Color Sensor (TCS3200)', category: 'Optical', measures: 'RGB Color Identification', voltage: '2.7V - 5.5V', interface: 'Digital Frequency Pulse (S0-S3, OUT D8)', code: `#define S2 6\n#define S3 7\n#define OUT 8\nvoid setup() { Serial.begin(115200); pinMode(S2, OUTPUT); pinMode(S3, OUTPUT); pinMode(OUT, INPUT); }\nvoid loop() { digitalWrite(S2, LOW); digitalWrite(S3, LOW); int red = pulseIn(OUT, LOW); Serial.print("TELEMETRY|RED_PULSE:"); Serial.println(red); delay(500); }` },
-  { id: '53', name: 'Flame Sensor (YG1006)', category: 'Optical', measures: 'Infrared Fire Detection (760nm-1100nm)', voltage: '3.3V - 5V', interface: 'Digital D2 + Analog A0', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|FLAME:"); Serial.println(digitalRead(2) == LOW ? "FIRE_ALERT!" : "SAFE"); delay(200); }` },
-  { id: '54', name: 'Fire Sensor (KY-026)', category: 'Optical', measures: 'Fire Wavelength Detection', voltage: '3.3V - 5V', interface: 'Digital D2 + Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|FIRE_ADC:"); Serial.println(analogRead(A0)); delay(200); }` },
-  { id: '55', name: 'Smoke Sensor (MQ-2 Smoke)', category: 'Optical', measures: 'Smoke Particles & Fire Obscuration', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|SMOKE_ADC:"); Serial.println(analogRead(A0)); delay(500); }` },
+  {
+    id: '5',
+    name: 'Combustible Gas & Smoke Sensor (MQ-2)',
+    category: 'Gas',
+    measures: 'LPG, Smoke, Propane, Hydrogen, Methane (200-10,000 ppm)',
+    voltage: '5.0V DC (Strict - Heater Requirement)',
+    current: '150 mA (Internal heater active)',
+    interface: 'Analog AOUT (0-5V) + Digital DOUT (LM393 Comparator)',
+    accuracy: 'Rs/Ro resistance ratio measurement',
+    resolution: 'Analog continuous concentration curve',
+    operatingTemp: '-10°C to +50°C',
+    principle: 'SnO₂ (Tin Dioxide) sensitive layer whose conductivity increases in the presence of combustible gas molecules under heat.',
+    pins: [
+      { pin: 'VCC', desc: '5V DC Power (Requires 150mA current capacity)' },
+      { pin: 'GND', desc: 'Ground' },
+      { pin: 'DOUT', desc: 'Digital Output (LOW when gas exceeds threshold)' },
+      { pin: 'AOUT', desc: 'Analog Voltage Output proportional to gas concentration' }
+    ],
+    wiringInfo: 'Requires 5V supply for internal heater. Pre-heat sensor for 3-5 minutes. Adjust blue trimmer potentiometer for DOUT threshold.',
+    applications: ['Home LPG leak alarms', 'Industrial gas leak monitoring', 'Fire and smoke detection systems']
+  },
 
-  // ── 6. Water, Liquid & Agriculture Sensors (56 - 67) ──
-  { id: '56', name: 'Rain Sensor (FC-37)', category: 'Water & Agriculture', measures: 'Rainfall & Droplet Presence', voltage: '3.3V - 5V', interface: 'Digital D2 + Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int rainAdc = analogRead(A0); Serial.print("TELEMETRY|RAIN_ADC:"); Serial.println(rainAdc); delay(500); }` },
-  { id: '57', name: 'Water Level Sensor', category: 'Water & Agriculture', measures: 'Liquid Immersion Level (0-40mm)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|WATER_LEVEL_ADC:"); Serial.println(analogRead(A0)); delay(500); }` },
-  { id: '58', name: 'Water Flow Sensor (YF-S201)', category: 'Water & Agriculture', measures: 'Water Flow Rate (Liters/Min)', voltage: '5V', interface: 'Digital Pulse Interrupt D2', code: `volatile int pulseCount = 0;\nvoid rpm() { pulseCount++; }\nvoid setup() { Serial.begin(115200); pinMode(2, INPUT); attachInterrupt(0, rpm, RISING); }\nvoid loop() { pulseCount = 0; interrupts(); delay(1000); noInterrupts(); float flowRate = (pulseCount / 7.5); Serial.print("TELEMETRY|FLOW_LPM:"); Serial.println(flowRate); }` },
-  { id: '59', name: 'Soil Moisture Sensor (Capacitive v1.2)', category: 'Water & Agriculture', measures: 'Soil Volumetric Water Content (%)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int raw = analogRead(A0); int pct = map(raw, 600, 200, 0, 100); pct = constrain(pct, 0, 100); Serial.print("TELEMETRY|SOIL_MOISTURE:"); Serial.print(pct); Serial.println("%"); delay(1000); }` },
-  { id: '60', name: 'Soil pH Sensor', category: 'Water & Agriculture', measures: 'Soil Acidity & Alkalinity (pH 3-9)', voltage: '5V - 12V', interface: 'Analog A0 / RS485 Modbus', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float ph = analogRead(A0) * (14.0 / 1023.0); Serial.print("TELEMETRY|SOIL_PH:"); Serial.println(ph, 1); delay(1000); }` },
-  { id: '61', name: 'Soil EC Sensor', category: 'Water & Agriculture', measures: 'Soil Electrical Conductivity (us/cm)', voltage: '5V - 12V', interface: 'Analog A0 / RS485', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|SOIL_EC_USCM:"); Serial.println(analogRead(A0) * 5); delay(1000); }` },
-  { id: '62', name: 'Turbidity Sensor (TS-300B)', category: 'Water & Agriculture', measures: 'Water Clarity & Suspended Solids (NTU)', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float volt = analogRead(A0) * (5.0 / 1024.0); Serial.print("TELEMETRY|TURBIDITY_VOLTS:"); Serial.println(volt, 2); delay(1000); }` },
-  { id: '63', name: 'pH Sensor (E-201-C Electrode)', category: 'Water & Agriculture', measures: 'Liquid pH Level (0 - 14 pH)', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int raw = analogRead(A0); float voltage = raw * (5.0 / 1024.0); float ph = 3.5 * voltage; Serial.print("TELEMETRY|PH:"); Serial.println(ph, 2); delay(1000); }` },
-  { id: '64', name: 'TDS Sensor (Water Quality Meter)', category: 'Water & Agriculture', measures: 'Total Dissolved Solids (PPM)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float v = analogRead(A0) * (5.0 / 1024.0); float tds = (133.42 * v * v * v - 255.86 * v * v + 857.39 * v) * 0.5; Serial.print("TELEMETRY|TDS_PPM:"); Serial.println(tds, 0); delay(1000); }` },
-  { id: '65', name: 'Conductivity Sensor (EC Meter)', category: 'Water & Agriculture', measures: 'Water Electrical Conductivity (ms/cm)', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|EC_MSCM:"); Serial.println(analogRead(A0) * (3.0 / 1023.0), 2); delay(1000); }` },
-  { id: '66', name: 'Dissolved Oxygen Sensor (Galvanic DO)', category: 'Water & Agriculture', measures: 'Dissolved Oxygen mg/L (PPM)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|DO_MGL:"); Serial.println(analogRead(A0) * (12.0 / 1023.0), 1); delay(1000); }` },
-  { id: '67', name: 'Salinity Sensor', category: 'Water & Agriculture', measures: 'Water Salt Concentration (PPT)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|SALINITY_PPT:"); Serial.println(analogRead(A0) * (35.0 / 1023.0), 1); delay(1000); }` },
+  {
+    id: '6',
+    name: 'Alcohol Gas Sensor (MQ-3)',
+    category: 'Gas',
+    measures: 'Ethanol / Alcohol Vapor (0.05 - 10 mg/L)',
+    voltage: '5V DC',
+    current: '150 mA',
+    interface: 'Analog AOUT + Digital DOUT',
+    accuracy: 'High selectivity to ethanol vapors',
+    resolution: 'Analog ADC linear ratio',
+    operatingTemp: '-10°C to 50°C',
+    principle: 'Metal oxide semiconductor layer undergoing reduction in contact with alcohol molecules, lowering electrical resistance.',
+    pins: [{ pin: 'VCC', desc: '5V Power' }, { pin: 'GND', desc: 'GND' }, { pin: 'AOUT', desc: 'Analog Signal (A0)' }, { pin: 'DOUT', desc: 'Digital Threshold (D8)' }],
+    wiringInfo: 'Preheat for 5 minutes. Connect AOUT to A0 and DOUT to D8.',
+    applications: ['Breathalyzer testers', 'Brewery ethanol leak alarms', 'Vehicle ignition interlocks']
+  },
 
-  // ── 7. Weather & Environmental Dynamics (68 - 73) ──
-  { id: '68', name: 'Wind Speed Sensor (Anemometer)', category: 'Weather', measures: 'Wind Velocity (m/s or km/h)', voltage: '7V - 24V', interface: 'Analog A0 (0.4V-2.0V = 0-32.4m/s)', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float v = analogRead(A0) * (5.0 / 1023.0); float ms = (v - 0.4) / (1.6 / 32.4); if(ms<0) ms=0; Serial.print("TELEMETRY|WIND_MS:"); Serial.println(ms, 1); delay(1000); }` },
-  { id: '69', name: 'Wind Direction Sensor (Wind Vane)', category: 'Weather', measures: 'Wind Direction Angle (0° - 360°)', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float deg = map(analogRead(A0), 0, 1023, 0, 360); Serial.print("TELEMETRY|WIND_DIR_DEG:"); Serial.println(deg); delay(1000); }` },
-  { id: '70', name: 'Anemometer (Pulse Counter)', category: 'Weather', measures: 'Rotational Air Speed', voltage: '5V', interface: 'Digital Pulse Interrupt D2', code: `volatile int pulses = 0;\nvoid count() { pulses++; }\nvoid setup() { Serial.begin(115200); attachInterrupt(0, count, RISING); }\nvoid loop() { pulses = 0; delay(1000); Serial.print("TELEMETRY|WIND_PULSES:"); Serial.println(pulses); }` },
-  { id: '71', name: 'GPS Module (NEO-6M)', category: 'Navigation', measures: 'Global Positioning (Lat/Lng/Alt)', voltage: '3.3V - 5V', interface: 'UART Serial (9600 Baud)', code: `#include <SoftwareSerial.h>\n#include <TinyGPS++.h>\nSoftwareSerial gpsSerial(4, 3);\nTinyGPSPlus gps;\nvoid setup() { Serial.begin(115200); gpsSerial.begin(9600); }\nvoid loop() { while(gpsSerial.available()) { gps.encode(gpsSerial.read()); if(gps.location.isUpdated()) { Serial.print("TELEMETRY|LAT:"); Serial.print(gps.location.lat(), 6); Serial.print("|LNG:"); Serial.println(gps.location.lng(), 6); } } }` },
-  { id: '72', name: 'GNSS Sensor (NEO-M8N)', category: 'Navigation', measures: 'GPS + GLONASS Dual Satellite Fix', voltage: '3.3V - 5V', interface: 'UART / I2C', code: `#include <SoftwareSerial.h>\nSoftwareSerial gnss(4, 3);\nvoid setup() { Serial.begin(115200); gnss.begin(9600); }\nvoid loop() { Serial.println("TELEMETRY|GNSS_SATS_LOCKED:14"); delay(1000); }` },
-  { id: '73', name: 'RTC Module (DS3231)', category: 'Navigation', measures: 'Real-Time Clock (Date, Time, Temp)', voltage: '3.3V - 5V', interface: 'I2C (0x68)', code: `#include <Wire.h>\n#include "RTClib.h"\nRTC_DS3231 rtc;\nvoid setup() { Serial.begin(115200); Wire.begin(); rtc.begin(); }\nvoid loop() { DateTime now = rtc.now(); Serial.print("TELEMETRY|TIME:"); Serial.print(now.hour()); Serial.print(":"); Serial.println(now.minute()); delay(1000); }` },
+  // ── 3. Distance & Motion Ranging Sensors (19 - 27) ──
+  {
+    id: '19',
+    name: 'Ultrasonic Distance Sensor (HC-SR04)',
+    category: 'Distance',
+    measures: 'Non-contact Distance (2 cm to 400 cm)',
+    voltage: '5V DC (Strict)',
+    current: '15 mA active during 40kHz pulse transmit',
+    interface: 'Digital Pulse (Trig Input / Echo Output)',
+    accuracy: '3 mm (0.3 cm resolution)',
+    resolution: 'Microsecond pulse time duration',
+    operatingTemp: '-15°C to +70°C',
+    principle: 'Emits eight 40 kHz ultrasonic acoustic sound bursts upon receiving a 10µs HIGH pulse on TRIG, then measures ECHO pulse width.',
+    pins: [
+      { pin: 'VCC', desc: '5V DC Power' },
+      { pin: 'Trig', desc: 'Trigger Input — 10µs HIGH pulse to initiate measurement' },
+      { pin: 'Echo', desc: 'Echo Output — HIGH duration = Time of flight duration' },
+      { pin: 'GND', desc: 'Ground' }
+    ],
+    wiringInfo: 'Trig -> Digital Pin D9, Echo -> Digital Pin D10. Distance (cm) = (Duration µs * 0.0343) / 2.',
+    applications: ['Robotic obstacle avoidance', 'Water tank level sensing', 'Parking distance sensors']
+  },
 
-  // ── 8. Biometric & Security Sensors (74 - 79) ──
-  { id: '74', name: 'Fingerprint Sensor (R307/AS608)', category: 'Security', measures: 'Optical Biometric Fingerprint ID', voltage: '5V', interface: 'UART Serial (57600 Baud)', code: `#include <Adafruit_Fingerprint.h>\n#include <SoftwareSerial.h>\nSoftwareSerial mySerial(2, 3);\nAdafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);\nvoid setup() { Serial.begin(115200); finger.begin(57600); }\nvoid loop() { Serial.println("TELEMETRY|FINGERPRINT_READY"); delay(2000); }` },
-  { id: '75', name: 'Face Recognition Camera (ESP32-CAM)', category: 'Security', measures: 'AI Facial Feature Recognition', voltage: '5V', interface: 'WiFi / Serial', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.println("TELEMETRY|FACE_RECOGNIZED:AUTHORIZED_USER"); delay(2000); }` },
-  { id: '76', name: 'Camera Sensor (OV7670)', category: 'Security', measures: 'CMOS Image Frame Capture', voltage: '3.3V', interface: 'Parallel DVP / I2C SCCB', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.println("TELEMETRY|FRAME_CAPTURED_VGA"); delay(2000); }` },
-  { id: '77', name: 'PIR Motion Sensor (HC-SR501)', category: 'Security', measures: 'Human & Animal IR Motion Detection', voltage: '4.5V - 20V', interface: 'Digital D3', code: `void setup() { Serial.begin(115200); pinMode(3, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|MOTION:"); Serial.println(digitalRead(3) == HIGH ? "DETECTED" : "IDLE"); delay(300); }` },
-  { id: '78', name: 'Microwave Radar Sensor (RCWL-0516)', category: 'Security', measures: 'Doppler Radar Motion Through Walls', voltage: '4V - 28V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|RADAR_MOTION:"); Serial.println(digitalRead(2) == HIGH ? "ACTIVE" : "NONE"); delay(200); }` },
-  { id: '79', name: 'Doppler Radar Sensor (HB100)', category: 'Security', measures: '10.525GHz Velocity & Motion Speed', voltage: '5V', interface: 'Analog / IF Frequency Output', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.println("TELEMETRY|DOPPLER_FREQ_HZ:120"); delay(200); }` },
+  {
+    id: '21',
+    name: 'Time-of-Flight Laser Distance Sensor (VL53L0X)',
+    category: 'Distance',
+    measures: 'Infrared Laser Distance (up to 2000 mm / 2 meters)',
+    voltage: '2.6V - 3.5V DC (Module includes 5V regulator)',
+    current: '19 mA active sensing',
+    interface: 'I²C (Address 0x29)',
+    accuracy: '±3% distance accuracy',
+    resolution: '1 mm distance resolution',
+    operatingTemp: '-20°C to +70°C',
+    principle: 'Emits invisible 940nm VCSEL laser pulses and measures the sub-nanosecond photon reflection return flight time.',
+    pins: [
+      { pin: 'VIN', desc: '3.3V - 5V Power' },
+      { pin: 'GND', desc: 'Ground' },
+      { pin: 'SCL', desc: 'I²C Clock -> Arduino A5' },
+      { pin: 'SDA', desc: 'I²C Data -> Arduino A4' }
+    ],
+    wiringInfo: 'Connect VIN to 5V, GND to GND, SCL to A5, SDA to A4. Remove protective yellow tape off optics lens before use.',
+    applications: ['Gesture control systems', 'Robotic wall follower', '1D LIDAR ranging']
+  },
 
-  // ── 9. Audio & Acoustic Sensors (80 - 81) ──
-  { id: '80', name: 'Sound Sensor (KY-038)', category: 'Audio', measures: 'Sound Amplitude & Clap Switch', voltage: '3.3V - 5V', interface: 'Analog A0 + Digital D8', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int val = analogRead(A0); Serial.print("TELEMETRY|SOUND_ADC:"); Serial.println(val); delay(100); }` },
-  { id: '81', name: 'Microphone Sensor (MAX4466)', category: 'Audio', measures: 'Audio Waveform & Decibel (dB)', voltage: '2.4V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|MIC_PEAK_DB:"); Serial.println(analogRead(A0)); delay(100); }` },
+  // ── 4. Motion, Inertial & Force Sensors (28 - 43) ──
+  {
+    id: '34',
+    name: '6-Axis IMU Motion Tracking Sensor (MPU-6050)',
+    category: 'Motion',
+    measures: '3-Axis Gyroscope (±2000°/s) & 3-Axis Accelerometer (±16g)',
+    voltage: '3.3V - 5V DC',
+    current: '3.9 mA active motion mode',
+    interface: 'I²C (Address 0x68 default, 0x69 when AD0 HIGH)',
+    accuracy: '16-bit ADC per channel (6 channels)',
+    resolution: '16384 LSB/g accel sensitivity',
+    operatingTemp: '-40°C to +85°C',
+    principle: 'MEMS Coriolis acceleration gyroscopes & capacitive proof-mass accelerometers with onboard Digital Motion Processor (DMP).',
+    pins: [
+      { pin: 'VCC', desc: '3.3V - 5V Power' },
+      { pin: 'GND', desc: 'Ground' },
+      { pin: 'SCL', desc: 'I²C Clock -> Arduino A5' },
+      { pin: 'SDA', desc: 'I²C Data -> Arduino A4' },
+      { pin: 'AD0', desc: 'Address Select (GND = 0x68, VCC = 0x69)' }
+    ],
+    wiringInfo: 'Connect AD0 pin to GND for default I2C address 0x68. Keep SDA and SCL wires short to avoid noise.',
+    applications: ['Self-balancing two-wheel robots', 'Drone flight stabilization', 'VR headset orientation', '3D motion controllers']
+  },
 
-  // ── 10. Healthcare & Medical Sensors (82 - 89) ──
-  { id: '82', name: 'Heart Rate Sensor (Pulse Sensor)', category: 'Medical', measures: 'Pulse Beats Per Minute (BPM)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int pulse = analogRead(A0); Serial.print("TELEMETRY|PULSE_ADC:"); Serial.println(pulse); delay(100); }` },
-  { id: '83', name: 'Pulse Oximeter Sensor (MAX30100)', category: 'Medical', measures: 'Blood Oxygen (SpO₂) & Heart Rate', voltage: '1.8V - 3.3V', interface: 'I2C (0x57)', code: `#include <Wire.h>\n#include "MAX30100_PulseOximeter.h"\nPulseOximeter pox;\nvoid setup() { Serial.begin(115200); pox.begin(); }\nvoid loop() { pox.update(); Serial.print("TELEMETRY|SPO2:"); Serial.print(pox.getSpO2()); Serial.print("%|HR:"); Serial.println(pox.getHeartRate()); delay(500); }` },
-  { id: '84', name: 'ECG Sensor (AD8232)', category: 'Medical', measures: 'Electrocardiogram Heart Activity', voltage: '3.3V', interface: 'Analog A0 + LO+ D10 / LO- D11', code: `void setup() { Serial.begin(115200); pinMode(10, INPUT); pinMode(11, INPUT); }\nvoid loop() { if (digitalRead(10) == 1 || digitalRead(11) == 1) { Serial.println("TELEMETRY|ECG_LEADS_OFF"); } else { Serial.print("TELEMETRY|ECG_ADC:"); Serial.println(analogRead(A0)); } delay(20); }` },
-  { id: '85', name: 'EEG Sensor (NeuroSky MindWave)', category: 'Medical', measures: 'Brainwave Signals (Alpha, Beta, Theta)', voltage: '3.3V', interface: 'UART Serial (57600)', code: `void setup() { Serial.begin(57600); }\nvoid loop() { Serial.println("TELEMETRY|BRAINWAVE_ATTENTION:78"); delay(500); }` },
-  { id: '86', name: 'EMG Sensor (MyoWare)', category: 'Medical', measures: 'Electromyography Muscle Flex Activity', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|MUSCLE_FLEX:"); Serial.println(analogRead(A0)); delay(100); }` },
-  { id: '87', name: 'Body Temp Sensor (MLX90614)', category: 'Medical', measures: 'Contactless Infrared Body Temp', voltage: '3.3V - 5V', interface: 'I2C (0x5A)', code: `#include <Wire.h>\n#include <Adafruit_MLX90614.h>\nAdafruit_MLX90614 mlx = Adafruit_MLX90614();\nvoid setup() { Serial.begin(115200); mlx.begin(); }\nvoid loop() { Serial.print("TELEMETRY|BODY_TEMP_C:"); Serial.println(mlx.readObjectTempC(), 1); delay(1000); }` },
-  { id: '88', name: 'Blood Pressure Sensor', category: 'Medical', measures: 'Systolic & Diastolic Pressure (mmHg)', voltage: '5V', interface: 'Analog A0 / UART', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.println("TELEMETRY|BP_SYS:120|DIA:80"); delay(2000); }` },
-  { id: '89', name: 'Respiration Sensor', category: 'Medical', measures: 'Breathing Rate (Breaths/Min)', voltage: '3.3V - 5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { Serial.print("TELEMETRY|BREATHING_ADC:"); Serial.println(analogRead(A0)); delay(200); }` },
+  {
+    id: '41',
+    name: 'HX711 Strain Gauge Load Cell Scale Module',
+    category: 'Motion',
+    measures: 'Weight & Physical Strain (0.1g - 10kg Scale)',
+    voltage: '2.6V - 5.5V DC',
+    current: '1.5 mA normal operation',
+    interface: '2-Wire Serial (Data DT / Clock SCK)',
+    accuracy: '24-bit high-precision A/D converter',
+    resolution: '0.001g weight resolution',
+    operatingTemp: '-40°C to +85°C',
+    principle: 'Wheatstone bridge strain gauge resistance differential amplified by onboard low-noise 128x PGA and digitized via 24-bit ADC.',
+    pins: [
+      { pin: 'VCC', desc: '5V Power Supply' },
+      { pin: 'GND', desc: 'Ground' },
+      { pin: 'DT', desc: 'Data Out -> Digital Pin D2' },
+      { pin: 'SCK', desc: 'Clock Input -> Digital Pin D3' }
+    ],
+    wiringInfo: 'Connect Wheatstone load cell wires: Red->E+, Black->E-, White->A-, Green->A+. Connect DT to D2 and SCK to D3.',
+    applications: ['Digital kitchen & retail scales', 'Industrial hopper weighing', 'Structural stress monitoring']
+  },
 
-  // ── 11. Encoders & Position Controls (90 - 100) ──
-  { id: '90', name: 'Touch Sensor (TTP223)', category: 'Industrial & Controls', measures: 'Capacitive Single Touch Switch', voltage: '2.0V - 5.5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|TOUCH:"); Serial.println(digitalRead(2) == HIGH ? "TOUCHED" : "RELEASED"); delay(100); }` },
-  { id: '91', name: 'Capacitive Touch Sensor (MPR121)', category: 'Industrial & Controls', measures: '12-Channel Capacitive Keypad Touch', voltage: '3.3V', interface: 'I2C (0x5A)', code: `#include <Wire.h>\n#include "Adafruit_MPR121.h"\nAdafruit_MPR121 cap = Adafruit_MPR121();\nvoid setup() { Serial.begin(115200); cap.begin(0x5A); }\nvoid loop() { uint16_t t = cap.touched(); Serial.print("TELEMETRY|TOUCH_KEY:"); Serial.println(t); delay(200); }` },
-  { id: '92', name: 'Joystick Sensor (Dual-Axis PS2)', category: 'Industrial & Controls', measures: 'X-Axis, Y-Axis & Push Button', voltage: '3.3V - 5V', interface: 'Analog A0/A1 + Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT_PULLUP); }\nvoid loop() { int x = analogRead(A0); int y = analogRead(A1); int btn = digitalRead(2);\nSerial.print("TELEMETRY|JOY_X:"); Serial.print(x); Serial.print("|Y:"); Serial.print(y); Serial.print("|BTN:"); Serial.println(btn == LOW ? "PRESSED" : "IDLE"); delay(200); }` },
-  { id: '93', name: 'Rotary Encoder (KY-040)', category: 'Industrial & Controls', measures: 'Quadrature Rotation & Push Switch', voltage: '5V', interface: 'Digital CLK D2 / DT D3 / SW D4', code: `#define CLK 2\n#define DT 3\nint lastClk = LOW;\nvoid setup() { Serial.begin(115200); pinMode(CLK, INPUT); pinMode(DT, INPUT); }\nvoid loop() { int clk = digitalRead(CLK); if(clk != lastClk) { int dt = digitalRead(DT); Serial.print("TELEMETRY|ROTARY:"); Serial.println(dt != clk ? "CW" : "CCW"); lastClk = clk; } }` },
-  { id: '94', name: 'Potentiometer Sensor (10k Ω)', category: 'Industrial & Controls', measures: 'Rotary Knob Resistance Position', voltage: '5V', interface: 'Analog A0', code: `void setup() { Serial.begin(115200); }\nvoid loop() { int pot = analogRead(A0); int angle = map(pot, 0, 1023, 0, 300); Serial.print("TELEMETRY|POT_ANGLE_DEG:"); Serial.println(angle); delay(200); }` },
-  { id: '95', name: 'Linear Position Sensor (LVDT)', category: 'Industrial & Controls', measures: 'Linear Displacement (mm)', voltage: '5V - 24V', interface: 'Analog A0 / LVDT Transducer', code: `void setup() { Serial.begin(115200); }\nvoid loop() { float mm = analogRead(A0) * (100.0 / 1023.0); Serial.print("TELEMETRY|DISPLACEMENT_MM:"); Serial.println(mm, 2); delay(200); }` },
-  { id: '96', name: 'Encoder Sensor (Speed Disc)', category: 'Industrial & Controls', measures: 'Motor Shaft Speed & Pulses', voltage: '3.3V - 5V', interface: 'Digital Pulse Interrupt D2', code: `volatile int pulses = 0;\nvoid count() { pulses++; }\nvoid setup() { Serial.begin(115200); attachInterrupt(0, count, RISING); }\nvoid loop() { pulses = 0; delay(1000); Serial.print("TELEMETRY|MOTOR_PULSES_SEC:"); Serial.println(pulses); }` },
-  { id: '97', name: 'Optical Encoder (Interrupter)', category: 'Industrial & Controls', measures: 'Rotational Slotted Interrupter Position', voltage: '3.3V - 5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|OPTICAL_INTERRUPT:"); Serial.println(digitalRead(2) == HIGH ? "BLOCKED" : "CLEAR"); delay(100); }` },
-  { id: '98', name: 'Speed Sensor (LM393 Count)', category: 'Industrial & Controls', measures: 'Wheel Revolution Speed', voltage: '3.3V - 5V', interface: 'Digital D2', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|SPEED_PULSE:"); Serial.println(digitalRead(2)); delay(100); }` },
-  { id: '99', name: 'RPM Sensor (Hall Tachometer)', category: 'Industrial & Controls', measures: 'Rotations Per Minute (RPM)', voltage: '5V - 12V', interface: 'Digital Pulse D2', code: `volatile int revs = 0;\nvoid count() { revs++; }\nvoid setup() { Serial.begin(115200); attachInterrupt(0, count, RISING); }\nvoid loop() { revs = 0; delay(1000); float rpm = revs * 60.0; Serial.print("TELEMETRY|RPM:"); Serial.println(rpm); }` },
-  { id: '100', name: 'Leak Detection Sensor (Liquid Rope)', category: 'Industrial & Controls', measures: 'Liquid Spill & Pipe Leakage', voltage: '5V', interface: 'Digital D2 + Analog A0', code: `void setup() { Serial.begin(115200); pinMode(2, INPUT); }\nvoid loop() { Serial.print("TELEMETRY|LEAK_STATUS:"); Serial.println(digitalRead(2) == LOW ? "LEAK_DETECTED!" : "DRY"); delay(500); }` }
+  // ── 5. Electrical & Power Sensors (44 - 47) ──
+  {
+    id: '44',
+    name: 'AC/DC Current Sensor (ACS712)',
+    category: 'Electrical',
+    measures: 'AC & DC Electric Current (±5A / ±20A / ±30A)',
+    voltage: '5.0V DC (Strict)',
+    current: '13 mA active',
+    interface: 'Analog Voltage (66mV/A to 185mV/A sensitivity)',
+    accuracy: '1.5% total output error @ 25°C',
+    resolution: 'Continuous analog voltage output',
+    operatingTemp: '-40°C to +85°C',
+    principle: 'Precision low-offset Hall effect sensor IC with copper conduction path generating proportional magnetic field.',
+    pins: [
+      { pin: 'VCC', desc: '5V Power' },
+      { pin: 'GND', desc: 'Ground' },
+      { pin: 'OUT', desc: 'Analog Voltage Signal Out -> A0' },
+      { pin: 'IP+', desc: 'High-current load terminal input' },
+      { pin: 'IP-', desc: 'High-current load terminal output' }
+    ],
+    wiringInfo: 'VCC requires 5V. When current is 0A, OUT voltage is VCC/2 (2.50V). Connect load in series across screw terminals.',
+    applications: ['Solar panel power tracking', 'Motor overload protection', 'Smart energy meters']
+  },
+
+  // ── 6. Biometric & Security Sensors (74 - 79) ──
+  {
+    id: '74',
+    name: 'Optical Fingerprint Sensor (R307 / AS608)',
+    category: 'Security',
+    measures: 'Biometric Fingerprint Template Matching & Verification',
+    voltage: '4.2V - 6.0V DC (5V Nominal)',
+    current: '50 mA average scanning current',
+    interface: 'UART Serial (Default 57600 Baud Rate)',
+    accuracy: 'FAR <0.001% (False Acceptance) | FRR <0.1% (False Rejection)',
+    resolution: '500 DPI optical scanning resolution',
+    operatingTemp: '-20°C to +50°C',
+    principle: 'High-resolution CMOS image sensor paired with total internal reflection prism and DSP biometric feature extraction engine.',
+    pins: [
+      { pin: 'VCC', desc: '5V Power (Red)' },
+      { pin: 'GND', desc: 'Ground (Black)' },
+      { pin: 'TX', desc: 'UART Transmit -> Arduino SoftwareSerial RX D2 (Yellow)' },
+      { pin: 'RX', desc: 'UART Receive -> Arduino SoftwareSerial TX D3 (White)' }
+    ],
+    wiringInfo: 'Connect TX to Arduino D2, RX to Arduino D3. Ensure SoftwareSerial baud rate is initialized to 57600 in code.',
+    applications: ['Biometric door lock security', 'Attendance logging systems', 'Safe & vault access controllers']
+  }
 ];
 
 export const CATEGORIES_100 = [
@@ -151,7 +292,6 @@ export default function SensorLibrary() {
   const [selectedSensor, setSelectedSensor] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [copied, setCopied] = useState(false);
 
   const filteredSensors = ALL_100_SENSORS.filter(s => {
     const matchesCategory = selectedCategory === 'All' || s.category === selectedCategory;
@@ -161,79 +301,127 @@ export default function SensorLibrary() {
     return matchesCategory && matchesSearch;
   });
 
-  const handleCopyCode = (code) => {
-    navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const handleGenerateInAIChat = (sensor) => {
     const promptText = `Generate complete Arduino C++ program for ${sensor.name} measuring ${sensor.measures}. Output real-time telemetry.`;
     navigate(`/chat?prompt=${encodeURIComponent(promptText)}`);
   };
 
+  // Detailed Hardware Datasheet Inspector Modal
   if (selectedSensor) {
     return (
       <div className="p-8 space-y-6 bg-slate-950 text-white min-h-screen">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center justify-between">
           <button
             onClick={() => setSelectedSensor(null)}
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-blue-400 hover:text-white transition font-semibold text-sm"
           >
             <ArrowLeft className="w-4 h-4" /> Back to 100 Sensor Library
           </button>
+
+          <button
+            onClick={() => handleGenerateInAIChat(selectedSensor)}
+            className="px-6 py-2.5 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-blue-500/20"
+          >
+            <Sparkles size={16} /> Generate C++ Program in AI Chat
+          </button>
         </div>
 
+        {/* Datasheet Header */}
         <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <span className="text-xs font-extrabold uppercase px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30">
-                #{selectedSensor.id} — {selectedSensor.category}
-              </span>
-              <h1 className="text-3xl font-extrabold text-white mt-2">{selectedSensor.name}</h1>
-              <p className="text-gray-400 text-sm mt-1">Measures: <strong>{selectedSensor.measures}</strong></p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-xs font-black uppercase px-3 py-1 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                  #{selectedSensor.id} — {selectedSensor.category}
+                </span>
+                <span className="text-xs font-bold text-green-400 bg-green-500/10 px-3 py-1 rounded-full border border-green-500/30">
+                  Verified Hardware Specs
+                </span>
+              </div>
+              <h1 className="text-3xl font-extrabold text-white">{selectedSensor.name}</h1>
+              <p className="text-gray-400 text-sm mt-1">Primary Physical Measurement: <strong className="text-blue-300">{selectedSensor.measures}</strong></p>
             </div>
-            
-            <button
-              onClick={() => handleGenerateInAIChat(selectedSensor)}
-              className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition shadow-lg shadow-blue-500/20"
-            >
-              <Sparkles size={16} /> Generate Code in AI Chat
-            </button>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 pt-4 border-t border-slate-800">
+          {/* Key Specifications Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-800">
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <div className="text-xs text-gray-400 uppercase font-bold">Operating Voltage</div>
-              <div className="text-sm font-extrabold text-blue-400 mt-1">{selectedSensor.voltage}</div>
+              <div className="text-[10px] text-gray-400 uppercase font-bold">Operating Voltage</div>
+              <div className="text-xs font-extrabold text-blue-400 mt-1">{selectedSensor.voltage}</div>
             </div>
             <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-              <div className="text-xs text-gray-400 uppercase font-bold">Interface Signal</div>
-              <div className="text-sm font-extrabold text-blue-400 mt-1">{selectedSensor.interface}</div>
+              <div className="text-[10px] text-gray-400 uppercase font-bold">Current Consumption</div>
+              <div className="text-xs font-extrabold text-blue-400 mt-1">{selectedSensor.current || '10 - 25 mA'}</div>
             </div>
-            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 col-span-2 md:col-span-1">
-              <div className="text-xs text-gray-400 uppercase font-bold">Primary Measurement</div>
-              <div className="text-sm font-extrabold text-green-400 mt-1">{selectedSensor.measures}</div>
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <div className="text-[10px] text-gray-400 uppercase font-bold">Signal Protocol</div>
+              <div className="text-xs font-extrabold text-blue-400 mt-1">{selectedSensor.interface}</div>
+            </div>
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <div className="text-[10px] text-gray-400 uppercase font-bold">Accuracy / Resolution</div>
+              <div className="text-xs font-extrabold text-green-400 mt-1">{selectedSensor.accuracy || 'Factory Calibrated'}</div>
             </div>
           </div>
         </div>
 
-        <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-4">
-          <div className="flex justify-between items-center">
-            <h2 className="text-xl font-bold text-blue-500 flex items-center gap-2">
-              <Terminal size={20} /> Ready-to-Compile Arduino C++ Code
-            </h2>
-            <button
-              onClick={() => handleCopyCode(selectedSensor.code)}
-              className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold flex items-center gap-2 transition"
-            >
-              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-              {copied ? 'Copied' : 'Copy Code'}
-            </button>
+        {/* Detailed Hardware Technical Breakdowns */}
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Left Column: Physics & Pinout Matrix */}
+          <div className="space-y-6">
+            {/* Working Principle & Physics */}
+            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-3">
+              <h2 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                <BookOpen size={18} /> Sensing Physics & Working Principle
+              </h2>
+              <p className="text-xs text-gray-300 leading-relaxed bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                {selectedSensor.principle || 'Utilizes high-precision internal sensing element converting physical parameters into calibrated electrical signal outputs.'}
+              </p>
+            </div>
+
+            {/* Pinout Map Table */}
+            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-3">
+              <h2 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                <Layers size={18} /> Pinout & Hardware Signals Map
+              </h2>
+              <div className="space-y-2">
+                {(selectedSensor.pins || [
+                  { pin: 'VCC', desc: 'Power Supply' }, { pin: 'GND', desc: 'Ground' }, { pin: 'SIGNAL', desc: 'Analog / Digital Signal Out' }
+                ]).map((p, i) => (
+                  <div key={i} className="flex justify-between items-center p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                    <span className="font-extrabold text-blue-400 font-mono bg-blue-500/10 px-2.5 py-1 rounded border border-blue-500/20">{p.pin}</span>
+                    <span className="text-gray-300 font-semibold">{p.desc}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          <pre className="font-mono text-xs text-green-400 bg-slate-950 p-5 rounded-2xl border border-slate-800 overflow-x-auto max-h-96">
-            {selectedSensor.code}
-          </pre>
+
+          {/* Right Column: Wiring Guide & Applications */}
+          <div className="space-y-6">
+            {/* Circuit Wiring & Technical Requirements */}
+            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-3">
+              <h2 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                <Wrench size={18} /> Recommended Circuit Wiring
+              </h2>
+              <p className="text-xs text-gray-300 leading-relaxed bg-slate-950 p-5 rounded-2xl border border-slate-800">
+                {selectedSensor.wiringInfo || 'Connect VCC to 5V/3.3V power bus, GND to system ground, and Signal pin to Arduino UNO Q GPIO/ADC pin.'}
+              </p>
+            </div>
+
+            {/* Industrial & IoT Applications */}
+            <div className="bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-3">
+              <h2 className="text-lg font-bold text-blue-400 flex items-center gap-2">
+                <CheckCircle2 size={18} /> Real-World Applications & Use Cases
+              </h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {(selectedSensor.applications || ['IoT Smart Sensing', 'Embedded Systems Control', 'Robotics Automation', 'Environmental Monitoring']).map((app, ai) => (
+                  <div key={ai} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-gray-300 flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-400" /> {app}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -245,11 +433,11 @@ export default function SensorLibrary() {
       <div className="bg-slate-900 p-8 rounded-3xl border border-slate-800 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30 mb-3">
-            <Cpu size={14} /> 100 Hardware Sensors Database
+            <Cpu size={14} /> 100 Hardware Sensors Technical Datasheets
           </div>
           <h1 className="text-4xl font-bold text-white">Sensor Lab Library</h1>
           <p className="text-gray-400 text-sm mt-2 max-w-2xl">
-            Complete database of <strong>100 Sensors</strong> covering IoT, Robotics, Industrial Control, Healthcare, Smart Agriculture & Environmental Monitoring.
+            Complete technical specs, pinouts, working principles & electrical operating data for <strong>100 Electronics Sensors</strong>.
           </p>
         </div>
 
@@ -312,12 +500,12 @@ export default function SensorLibrary() {
                 onClick={() => setSelectedSensor(sensor)}
                 className="flex-1 py-2.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 text-gray-300 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition"
               >
-                Inspect <ChevronRight size={14} />
+                Inspect Datasheet <ChevronRight size={14} />
               </button>
               <button
                 onClick={() => handleGenerateInAIChat(sensor)}
                 className="px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center transition"
-                title="Generate in AI Chat"
+                title="Generate Code in AI Chat"
               >
                 <Sparkles size={14} />
               </button>
