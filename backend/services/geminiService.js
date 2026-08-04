@@ -1,5 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
-
 // Advanced Hardware Module Engine & Universal Synthesizer
 export function generateExactOrSynthesizedCode(prompt) {
   const lp = prompt.toLowerCase();
@@ -537,17 +535,11 @@ export async function generateResponse(prompt) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (apiKey && apiKey.trim() !== "") {
     try {
-      let GoogleGenAIModule;
-      try {
-        GoogleGenAIModule = await import("@google/genai");
-      } catch (e) {
-        GoogleGenAIModule = await import("@google/generative-ai");
-      }
-      const GoogleGenAI = GoogleGenAIModule.GoogleGenAI || GoogleGenAIModule.GoogleGenerativeAI;
-      const client = new GoogleGenAI({ apiKey });
-      const response = await client.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: `You are AI SENSE, an expert AI embedded systems engineer specializing in Arduino C++.
+      const { GoogleGenerativeAI } = await import("@google/generative-ai");
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const result = await model.generateContent(
+        `You are AI SENSE, an expert AI embedded systems engineer specializing in Arduino C++.
 Generate EXACT, fully working, compilable Arduino C++ code and circuit wiring for ANY user prompt: "${prompt}".
 Respond ONLY with a valid JSON object:
 {
@@ -557,8 +549,8 @@ Respond ONLY with a valid JSON object:
   "code": "// Compilable Arduino C++ code with Serial.print TELEMETRY|...",
   "explanation": ["Step 1", "Step 2"]
 }`
-      });
-      let text = (response.text || response.response?.text() || "").trim();
+      );
+      let text = result.response.text().trim();
       if (text.startsWith("```json")) text = text.replace(/^```json/, "");
       if (text.startsWith("```")) text = text.replace(/^```/, "");
       if (text.endsWith("```")) text = text.replace(/```$/, "");
