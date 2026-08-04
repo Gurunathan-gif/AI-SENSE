@@ -2,13 +2,204 @@ import api from "../api/api";
 
 export function generateExactOrSynthesizedCodeFrontend(prompt) {
   const lp = prompt.toLowerCase();
+  
+  const cleanedPrompt = lp
+    .replace(/give\s+(a\s+)?(code|program|project)\s+(for|to|of)?/g, '')
+    .replace(/write\s+(a\s+)?(code|program|project)\s+(for|to|of)?/g, '')
+    .replace(/create\s+(a\s+)?(code|program|project)\s+(for|to|of)?/g, '')
+    .replace(/interface\s+(a\s+)?/g, '')
+    .replace(/connect\s+(a\s+)?/g, '')
+    .trim();
+
   let title = "Arduino Sensor Program";
   let code = "";
   let wiring = [];
   let componentsNeeded = ["Arduino UNO Q", "Breadboard", "Jumper Wires"];
 
-  // 1. HC-SR04 Ultrasonic Distance Sensor
-  if (lp.includes("ultrasonic") || lp.includes("hc-sr04") || lp.includes("distance sonar")) {
+  // 1. TCS3200 / TCS230 Color Sensor
+  if (cleanedPrompt.includes("color") || cleanedPrompt.includes("colour") || cleanedPrompt.includes("tcs3200") || cleanedPrompt.includes("tcs230")) {
+    title = "TCS3200 Color Sensor RGB Identification System";
+    componentsNeeded.push("TCS3200 / TCS230 Color Sensor Module", "Status RGB / Indicator LED");
+    wiring = [
+      "TCS3200 VCC -> 5V DC",
+      "TCS3200 GND -> GND",
+      "S0 Pin -> Digital D4 (Frequency Scaling 20%)",
+      "S1 Pin -> Digital D5",
+      "S2 Pin -> Digital D6 (Color Filter Selection)",
+      "S3 Pin -> Digital D7",
+      "OUT Pin -> Digital D8 (Frequency Output Pulse)"
+    ];
+    code = `/*
+ * AI SENSE — TCS3200 / TCS230 Color Sensor
+ * RGB Color Recognition & Pulse Frequency Measurement
+ */
+
+#define S0_PIN 4
+#define S1_PIN 5
+#define S2_PIN 6
+#define S3_PIN 7
+#define OUT_PIN 8
+
+int redFrequency = 0;
+int greenFrequency = 0;
+int blueFrequency = 0;
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(S0_PIN, OUTPUT);
+  pinMode(S1_PIN, OUTPUT);
+  pinMode(S2_PIN, OUTPUT);
+  pinMode(S3_PIN, OUTPUT);
+  pinMode(OUT_PIN, INPUT);
+
+  // Set Frequency scaling to 20%
+  digitalWrite(S0_PIN, HIGH);
+  digitalWrite(S1_PIN, LOW);
+}
+
+void loop() {
+  // Read Red filtered pulse frequency
+  digitalWrite(S2_PIN, LOW);
+  digitalWrite(S3_PIN, LOW);
+  redFrequency = pulseIn(OUT_PIN, LOW);
+  delay(100);
+
+  // Read Green filtered pulse frequency
+  digitalWrite(S2_PIN, HIGH);
+  digitalWrite(S3_PIN, HIGH);
+  greenFrequency = pulseIn(OUT_PIN, LOW);
+  delay(100);
+
+  // Read Blue filtered pulse frequency
+  digitalWrite(S2_PIN, LOW);
+  digitalWrite(S3_PIN, HIGH);
+  blueFrequency = pulseIn(OUT_PIN, LOW);
+  delay(100);
+
+  int redColor = map(redFrequency, 25, 72, 255, 0);
+  int greenColor = map(greenFrequency, 30, 90, 255, 0);
+  int blueColor = map(blueFrequency, 25, 70, 255, 0);
+
+  Serial.print("TELEMETRY|RED:");
+  Serial.print(redColor);
+  Serial.print("|GREEN:");
+  Serial.print(greenColor);
+  Serial.print("|BLUE:");
+  Serial.println(blueColor);
+
+  delay(500);
+}`;
+  }
+
+  // 2. Optical Fingerprint Sensor (FPM10A / R307 / AS608)
+  else if (cleanedPrompt.includes("finger") || cleanedPrompt.includes("fingerprint") || cleanedPrompt.includes("biometric") || cleanedPrompt.includes("r307") || cleanedPrompt.includes("as608")) {
+    title = "FPM10A / R307 Optical Fingerprint Access Control";
+    componentsNeeded.push("R307 / AS608 Optical Fingerprint Sensor", "5V Solenoid Door Lock Relay", "Green & Red LEDs");
+    wiring = [
+      "Fingerprint Sensor VCC -> 5V DC (Strict)",
+      "Fingerprint Sensor GND -> GND",
+      "Fingerprint TX -> Digital D2 (SoftwareSerial RX)",
+      "Fingerprint RX -> Digital D3 (SoftwareSerial TX)",
+      "Door Lock Relay -> Digital D7",
+      "Status LED -> Digital D13"
+    ];
+    code = `/*
+ * AI SENSE — Optical Fingerprint Sensor (R307 / AS608)
+ * Biometric Verification & Access Control System
+ */
+
+#include <Adafruit_Fingerprint.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial mySerial(2, 3); // RX=D2, TX=D3
+Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
+
+#define RELAY_PIN 7
+#define LED_PIN 13
+
+void setup() {
+  Serial.begin(115200);
+  pinMode(RELAY_PIN, OUTPUT);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+
+  finger.begin(57600);
+  if (finger.verifyPassword()) {
+    Serial.println("TELEMETRY|STATUS:FINGERPRINT_SENSOR_READY");
+  } else {
+    Serial.println("TELEMETRY|STATUS:FINGERPRINT_NOT_FOUND");
+  }
+}
+
+void loop() {
+  int fingerprintID = getFingerprintID();
+  if (fingerprintID > 0) {
+    Serial.print("TELEMETRY|FINGER_MATCH_ID:");
+    Serial.print(fingerprintID);
+    Serial.println("|ACCESS:GRANTED");
+
+    digitalWrite(LED_PIN, HIGH);
+    digitalWrite(RELAY_PIN, HIGH);
+    delay(3000);
+    digitalWrite(RELAY_PIN, LOW);
+    digitalWrite(LED_PIN, LOW);
+  }
+  delay(200);
+}
+
+int getFingerprintID() {
+  uint8_t p = finger.getImage();
+  if (p != FINGERPRINT_OK) return -1;
+
+  p = finger.image2Tz();
+  if (p != FINGERPRINT_OK) return -1;
+
+  p = finger.fingerFastSearch();
+  if (p != FINGERPRINT_OK) return -1;
+
+  return finger.fingerID;
+}`;
+  }
+
+  // 3. HX711 Load Cell Weight Scale
+  else if (cleanedPrompt.includes("weight") || cleanedPrompt.includes("load cell") || cleanedPrompt.includes("hx711") || cleanedPrompt.includes("scale")) {
+    title = "HX711 Load Cell Precision Weight Scale";
+    componentsNeeded.push("HX711 Amplifier Module", "5kg / 10kg Strain Gauge Load Cell");
+    wiring = [
+      "HX711 VCC -> 5V", "HX711 GND -> GND", "HX711 DT -> Digital D2", "HX711 SCK -> Digital D3"
+    ];
+    code = `/*
+ * AI SENSE — HX711 Load Cell Weight Measurement
+ */
+
+#include "HX711.h"
+
+#define LOADCELL_DOUT_PIN 2
+#define LOADCELL_SCK_PIN 3
+
+HX711 scale;
+float calibration_factor = -7050;
+
+void setup() {
+  Serial.begin(115200);
+  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
+  scale.set_scale(calibration_factor);
+  scale.tare();
+}
+
+void loop() {
+  if (scale.is_ready()) {
+    float weightGrams = scale.get_units(5) * 1000.0;
+    Serial.print("TELEMETRY|WEIGHT_GRAMS:");
+    Serial.print(weightGrams, 1);
+    Serial.println("G");
+  }
+  delay(500);
+}`;
+  }
+
+  // 4. HC-SR04 Ultrasonic Distance Sensor
+  else if (cleanedPrompt.includes("ultrasonic") || cleanedPrompt.includes("hc-sr04") || cleanedPrompt.includes("distance")) {
     title = "HC-SR04 Ultrasonic Distance Alert System";
     componentsNeeded.push("HC-SR04 Ultrasonic Sensor", "Piezo Buzzer", "LED", "220Ω Resistor");
     wiring = ["HC-SR04 VCC -> 5V", "HC-SR04 GND -> GND", "Trig Pin -> Digital D9", "Echo Pin -> Digital D10", "Buzzer -> Digital D8", "LED -> Digital D13"];
@@ -55,133 +246,8 @@ void loop() {
   delay(200);
 }`;
   }
-  // 2. DHT11 / DHT22 Temperature & Humidity Sensor
-  else if (lp.includes("dht") || lp.includes("dht11") || lp.includes("dht22")) {
-    title = "DHT Temperature & Humidity Environmental Control";
-    componentsNeeded.push("DHT11 / DHT22 Sensor", "5V Relay Module", "10kΩ Pull-Up Resistor");
-    wiring = ["DHT VCC -> 5V DC", "DHT GND -> GND", "DHT Data -> Digital D2 (with 10kΩ pull-up to 5V)", "Relay IN -> Digital D7"];
-    code = `/*
- * AI SENSE — DHT Temperature & Humidity Environmental Control
- * Single-Wire Digital Protocol & Relay Trigger
- */
 
-#include <DHT.h>
-
-#define DHTPIN 2
-#define DHTTYPE DHT11
-#define RELAY_PIN 7
-
-DHT dht(DHTPIN, DHTTYPE);
-
-void setup() {
-  Serial.begin(115200);
-  dht.begin();
-  pinMode(RELAY_PIN, OUTPUT);
-}
-
-void loop() {
-  delay(2000);
-
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
-
-  if (isnan(h) || isnan(t)) {
-    Serial.println("TELEMETRY|STATUS:DHT_READ_ERROR");
-    return;
-  }
-
-  Serial.print("TELEMETRY|TEMP:");
-  Serial.print(t, 1);
-  Serial.print("C|HUMIDITY:");
-  Serial.print(h, 1);
-  Serial.println("%");
-
-  if (t >= 28.0) {
-    digitalWrite(RELAY_PIN, HIGH);
-  } else {
-    digitalWrite(RELAY_PIN, LOW);
-  }
-}`;
-  }
-  // 3. MQ-2 / MQ-135 Gas & Smoke Sensor
-  else if (lp.includes("mq") || lp.includes("mq-2") || lp.includes("mq-135") || lp.includes("smoke")) {
-    title = "MQ Gas & Smoke Leak Detection Alarm";
-    componentsNeeded.push("MQ Gas Sensor", "Piezo Alarm Buzzer", "Status Red LED");
-    wiring = ["MQ VCC -> 5V (Requires 150mA Heater)", "MQ GND -> GND", "MQ AOUT -> Analog A0", "MQ DOUT -> Digital D8", "Buzzer -> Digital D9"];
-    code = `/*
- * AI SENSE — MQ Gas & Smoke Detection System
- * Analog ADC Read & Digital Comparator Alert
- */
-
-#define GAS_ANALOG A0
-#define GAS_DIGITAL 8
-#define BUZZER_PIN 9
-#define THRESHOLD_ADC 350
-
-void setup() {
-  Serial.begin(115200);
-  pinMode(GAS_DIGITAL, INPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
-}
-
-void loop() {
-  int gasAdc = analogRead(GAS_ANALOG);
-  int gasDigital = digitalRead(GAS_DIGITAL);
-
-  Serial.print("TELEMETRY|GAS_ADC:");
-  Serial.print(gasAdc);
-  Serial.print("|ALERT:");
-  Serial.println(gasAdc > THRESHOLD_ADC ? "WARNING_GAS_LEAK" : "NORMAL");
-
-  if (gasAdc > THRESHOLD_ADC || gasDigital == LOW) {
-    tone(BUZZER_PIN, 2500);
-  } else {
-    noTone(BUZZER_PIN);
-  }
-
-  delay(300);
-}`;
-  }
-  // 4. BMP280 Barometric Pressure & Altitude
-  else if (lp.includes("bmp280") || lp.includes("bme280") || lp.includes("pressure")) {
-    title = "BMP280 Barometric Pressure & Altitude Monitor";
-    componentsNeeded.push("BMP280 Sensor Module", "3.3V Power Supply");
-    wiring = ["BMP280 VCC -> 3.3V", "GND -> GND", "SCL -> Arduino SCL (A5)", "SDA -> Arduino SDA (A4)"];
-    code = `/*
- * AI SENSE — BMP280 Barometric Pressure & Altitude Sensor
- * I2C Protocol (0x76 / 0x77)
- */
-
-#include <Wire.h>
-#include <Adafruit_BMP280.h>
-
-Adafruit_BMP280 bmp;
-
-void setup() {
-  Serial.begin(115200);
-  if (!bmp.begin(0x76)) {
-    Serial.println("TELEMETRY|STATUS:BMP280_INIT_FAILED");
-    while (1);
-  }
-}
-
-void loop() {
-  float temp = bmp.readTemperature();
-  float press = bmp.readPressure() / 100.0F;
-  float alt = bmp.readAltitude(1013.25);
-
-  Serial.print("TELEMETRY|TEMP:");
-  Serial.print(temp, 1);
-  Serial.print("C|PRESS:");
-  Serial.print(press, 1);
-  Serial.print("HPA|ALT:");
-  Serial.print(alt, 1);
-  Serial.println("M");
-
-  delay(1000);
-}`;
-  }
-  // 5. Universal Heuristic Synthesizer for Any Unlisted Custom Prompt
+  // 5. Universal Heuristic Synthesizer
   else {
     return synthesizeCustomSensorCodeFrontend(prompt);
   }
@@ -193,9 +259,14 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
   const lp = prompt.toLowerCase();
   
   const cleanWords = prompt
+    .replace(/give\s+(a\s+)?(code|program|project)\s+(for|to|of)?/gi, '')
+    .replace(/write\s+(a\s+)?(code|program|project)\s+(for|to|of)?/gi, '')
+    .replace(/create\s+(a\s+)?(code|program|project)\s+(for|to|of)?/gi, '')
+    .replace(/interface\s+(a\s+)?/gi, '')
+    .replace(/connect\s+(a\s+)?/gi, '')
     .replace(/[^a-zA-Z0-9\s]/g, '')
     .split(/\s+/)
-    .filter(w => w.length > 2 && !['with', 'sensor', 'code', 'using', 'make', 'create', 'arduino', 'program', 'connect', 'interface', 'circuit', 'system', 'build', 'for', 'and', 'the'].includes(w.toLowerCase()));
+    .filter(w => w.length > 2 && !['with', 'sensor', 'code', 'using', 'make', 'create', 'arduino', 'program', 'connect', 'interface', 'circuit', 'system', 'build', 'for', 'and', 'the', 'give'].includes(w.toLowerCase()));
 
   const primaryName = cleanWords.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Custom Hardware Module';
   const tag = primaryName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
@@ -233,7 +304,7 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
     wiring.push("Relay Control IN -> Digital Pin D7", "Relay VCC -> 5V", "Relay GND -> GND");
     defines.push("#define RELAY_PIN 7");
     setupBody.push("  pinMode(RELAY_PIN, OUTPUT);");
-    setupBody.push("  digitalWrite(RELAY_PIN, LOW); // Relay OFF initially");
+    setupBody.push("  digitalWrite(RELAY_PIN, LOW);");
   }
 
   if (hasLED) {
@@ -256,24 +327,10 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
     includes.push("#include <Wire.h>");
     includes.push("#include <LiquidCrystal_I2C.h>");
     componentsNeeded.push("LCD 16x2 I2C Display");
-    wiring.push("LCD SDA -> SDA (A4)", "LCD SCL -> SCL (A5)", "LCD VCC -> 5V", "LCD GND -> GND");
+    wiring.push("LCD SDA -> SDA (A4)", "LCD SCL -> SCL (A5)");
     defines.push("LiquidCrystal_I2C lcd(0x27, 16, 2);");
     setupBody.push("  Wire.begin(); lcd.init(); lcd.backlight();");
     setupBody.push(`  lcd.setCursor(0, 0); lcd.print("${primaryName.slice(0, 16)}");`);
-  }
-
-  if (hasOLED) {
-    includes.push("#include <Wire.h>");
-    includes.push("#include <Adafruit_GFX.h>");
-    includes.push("#include <Adafruit_SSD1306.h>");
-    componentsNeeded.push("OLED SSD1306 Display");
-    wiring.push("OLED SDA -> SDA (A4)", "OLED SCL -> SCL (A5)");
-    defines.push("#define SCREEN_WIDTH 128\n#define SCREEN_HEIGHT 64\nAdafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);");
-    setupBody.push("  Wire.begin();");
-    setupBody.push("  if (display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {");
-    setupBody.push("    display.clearDisplay(); display.setTextSize(1); display.setTextColor(SSD1306_WHITE);");
-    setupBody.push(`    display.setCursor(0, 0); display.println("${primaryName.slice(0, 20)}"); display.display();`);
-    setupBody.push("  }");
   }
 
   if (isI2C) {
@@ -336,12 +393,6 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
   if (hasServo) loopBody.push("    myServo.write(0);");
 
   loopBody.push("  }");
-
-  if (hasLCD && !hasOLED) {
-    loopBody.push("  lcd.setCursor(0, 1); lcd.print(\"Val: \");");
-    if (isAnalog) loopBody.push("  lcd.print(rawAdc); lcd.print(\"    \");");
-    else loopBody.push("  lcd.print(sensorState == HIGH ? \"ACTIVE\" : \"IDLE  \");");
-  }
 
   loopBody.push("  Serial.println();");
   loopBody.push("  delay(400);");
