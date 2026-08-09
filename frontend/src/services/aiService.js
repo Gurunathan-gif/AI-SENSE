@@ -1,6 +1,6 @@
 import api from "../api/api";
 
-export function generateExactOrSynthesizedCodeFrontend(prompt) {
+export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Arduino UNO Q") {
   const lp = prompt.toLowerCase();
   
   const cleanedPrompt = lp
@@ -11,27 +11,28 @@ export function generateExactOrSynthesizedCodeFrontend(prompt) {
     .replace(/connect\s+(a\s+)?/g, '')
     .trim();
 
-  let title = "Arduino Sensor Program";
+  let title = "Arduino UNO Q Sensor Program";
   let code = "";
   let wiring = [];
-  let componentsNeeded = ["Arduino UNO Q", "Breadboard", "Jumper Wires"];
+  let componentsNeeded = ["Arduino UNO Q Single Board Computer", "Breadboard", "Jumper Wires"];
 
   // 1. TCS3200 / TCS230 Color Sensor
   if (cleanedPrompt.includes("color") || cleanedPrompt.includes("colour") || cleanedPrompt.includes("tcs3200") || cleanedPrompt.includes("tcs230")) {
-    title = "TCS3200 Color Sensor RGB Identification System";
+    title = "Arduino UNO Q — TCS3200 Color Sensor RGB System";
     componentsNeeded.push("TCS3200 / TCS230 Color Sensor Module", "Status RGB / Indicator LED");
     wiring = [
-      "TCS3200 VCC -> 5V DC",
-      "TCS3200 GND -> GND",
+      "TCS3200 VCC -> 5V DC Power Bus",
+      "TCS3200 GND -> Arduino UNO Q GND",
       "S0 Pin -> Digital D4 (Frequency Scaling 20%)",
       "S1 Pin -> Digital D5",
-      "S2 Pin -> Digital D6 (Color Filter Selection)",
+      "S2 Pin -> Digital D6 (Color Filter Select)",
       "S3 Pin -> Digital D7",
-      "OUT Pin -> Digital D8 (Frequency Output Pulse)"
+      "OUT Pin -> Digital D8 (Frequency Pulse)"
     ];
     code = `/*
- * AI SENSE — TCS3200 / TCS230 Color Sensor
- * RGB Color Recognition & Pulse Frequency Measurement
+ * AI SENSE — Arduino UNO Q Single Board Computer
+ * Qualcomm QRB2210 AP + STM32U585 Coprocessor
+ * Target: TCS3200 / TCS230 Color Sensor RGB Recognition
  */
 
 #define S0_PIN 4
@@ -45,36 +46,36 @@ int greenFrequency = 0;
 int blueFrequency = 0;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(115200); // 115200 Baud WebSerial Telemetry
   pinMode(S0_PIN, OUTPUT);
   pinMode(S1_PIN, OUTPUT);
   pinMode(S2_PIN, OUTPUT);
   pinMode(S3_PIN, OUTPUT);
   pinMode(OUT_PIN, INPUT);
 
-  // Set Frequency scaling to 20%
+  // Frequency scaling 20%
   digitalWrite(S0_PIN, HIGH);
   digitalWrite(S1_PIN, LOW);
 }
 
 void loop() {
-  // Read Red filtered pulse frequency
+  // Red filter pulse
   digitalWrite(S2_PIN, LOW);
   digitalWrite(S3_PIN, LOW);
   redFrequency = pulseIn(OUT_PIN, LOW);
-  delay(100);
+  delay(50);
 
-  // Read Green filtered pulse frequency
+  // Green filter pulse
   digitalWrite(S2_PIN, HIGH);
   digitalWrite(S3_PIN, HIGH);
   greenFrequency = pulseIn(OUT_PIN, LOW);
-  delay(100);
+  delay(50);
 
-  // Read Blue filtered pulse frequency
+  // Blue filter pulse
   digitalWrite(S2_PIN, LOW);
   digitalWrite(S3_PIN, HIGH);
   blueFrequency = pulseIn(OUT_PIN, LOW);
-  delay(100);
+  delay(50);
 
   int redColor = map(redFrequency, 25, 72, 255, 0);
   int greenColor = map(greenFrequency, 30, 90, 255, 0);
@@ -87,25 +88,25 @@ void loop() {
   Serial.print("|BLUE:");
   Serial.println(blueColor);
 
-  delay(500);
+  delay(400);
 }`;
   }
 
   // 2. Optical Fingerprint Sensor (FPM10A / R307 / AS608)
   else if (cleanedPrompt.includes("finger") || cleanedPrompt.includes("fingerprint") || cleanedPrompt.includes("biometric") || cleanedPrompt.includes("r307") || cleanedPrompt.includes("as608")) {
-    title = "FPM10A / R307 Optical Fingerprint Access Control";
-    componentsNeeded.push("R307 / AS608 Optical Fingerprint Sensor", "5V Solenoid Door Lock Relay", "Green & Red LEDs");
+    title = "Arduino UNO Q — R307 Fingerprint Biometric Controller";
+    componentsNeeded.push("R307 / AS608 Optical Fingerprint Sensor", "5V Solenoid Door Lock Relay");
     wiring = [
-      "Fingerprint Sensor VCC -> 5V DC (Strict)",
-      "Fingerprint Sensor GND -> GND",
+      "Fingerprint VCC -> 5V DC (Strict)",
+      "Fingerprint GND -> GND",
       "Fingerprint TX -> Digital D2 (SoftwareSerial RX)",
       "Fingerprint RX -> Digital D3 (SoftwareSerial TX)",
-      "Door Lock Relay -> Digital D7",
-      "Status LED -> Digital D13"
+      "Door Relay -> Digital D7"
     ];
     code = `/*
- * AI SENSE — Optical Fingerprint Sensor (R307 / AS608)
- * Biometric Verification & Access Control System
+ * AI SENSE — Arduino UNO Q Single Board Computer
+ * Qualcomm QRB2210 + STM32U585 ARM Cortex-M33
+ * Target: Optical Fingerprint Access Controller
  */
 
 #include <Adafruit_Fingerprint.h>
@@ -115,17 +116,15 @@ SoftwareSerial mySerial(2, 3); // RX=D2, TX=D3
 Adafruit_Fingerprint finger = Adafruit_Fingerprint(&mySerial);
 
 #define RELAY_PIN 7
-#define LED_PIN 13
 
 void setup() {
   Serial.begin(115200);
   pinMode(RELAY_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
   digitalWrite(RELAY_PIN, LOW);
 
   finger.begin(57600);
   if (finger.verifyPassword()) {
-    Serial.println("TELEMETRY|STATUS:FINGERPRINT_SENSOR_READY");
+    Serial.println("TELEMETRY|STATUS:FINGERPRINT_READY");
   } else {
     Serial.println("TELEMETRY|STATUS:FINGERPRINT_NOT_FOUND");
   }
@@ -138,11 +137,9 @@ void loop() {
     Serial.print(fingerprintID);
     Serial.println("|ACCESS:GRANTED");
 
-    digitalWrite(LED_PIN, HIGH);
     digitalWrite(RELAY_PIN, HIGH);
     delay(3000);
     digitalWrite(RELAY_PIN, LOW);
-    digitalWrite(LED_PIN, LOW);
   }
   delay(200);
 }
@@ -161,101 +158,15 @@ int getFingerprintID() {
 }`;
   }
 
-  // 3. HX711 Load Cell Weight Scale
-  else if (cleanedPrompt.includes("weight") || cleanedPrompt.includes("load cell") || cleanedPrompt.includes("hx711") || cleanedPrompt.includes("scale")) {
-    title = "HX711 Load Cell Precision Weight Scale";
-    componentsNeeded.push("HX711 Amplifier Module", "5kg / 10kg Strain Gauge Load Cell");
-    wiring = [
-      "HX711 VCC -> 5V", "HX711 GND -> GND", "HX711 DT -> Digital D2", "HX711 SCK -> Digital D3"
-    ];
-    code = `/*
- * AI SENSE — HX711 Load Cell Weight Measurement
- */
-
-#include "HX711.h"
-
-#define LOADCELL_DOUT_PIN 2
-#define LOADCELL_SCK_PIN 3
-
-HX711 scale;
-float calibration_factor = -7050;
-
-void setup() {
-  Serial.begin(115200);
-  scale.begin(LOADCELL_DOUT_PIN, LOADCELL_SCK_PIN);
-  scale.set_scale(calibration_factor);
-  scale.tare();
-}
-
-void loop() {
-  if (scale.is_ready()) {
-    float weightGrams = scale.get_units(5) * 1000.0;
-    Serial.print("TELEMETRY|WEIGHT_GRAMS:");
-    Serial.print(weightGrams, 1);
-    Serial.println("G");
-  }
-  delay(500);
-}`;
-  }
-
-  // 4. HC-SR04 Ultrasonic Distance Sensor
-  else if (cleanedPrompt.includes("ultrasonic") || cleanedPrompt.includes("hc-sr04") || cleanedPrompt.includes("distance")) {
-    title = "HC-SR04 Ultrasonic Distance Alert System";
-    componentsNeeded.push("HC-SR04 Ultrasonic Sensor", "Piezo Buzzer", "LED", "220Ω Resistor");
-    wiring = ["HC-SR04 VCC -> 5V", "HC-SR04 GND -> GND", "Trig Pin -> Digital D9", "Echo Pin -> Digital D10", "Buzzer -> Digital D8", "LED -> Digital D13"];
-    code = `/*
- * AI SENSE — HC-SR04 Ultrasonic Distance Sensor
- * Precision Sonar Distance Measurement & Alarm System
- */
-
-#define TRIG_PIN 9
-#define ECHO_PIN 10
-#define BUZZER_PIN 8
-#define LED_PIN 13
-
-void setup() {
-  Serial.begin(115200);
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
-  pinMode(BUZZER_PIN, OUTPUT);
-  pinMode(LED_PIN, OUTPUT);
-}
-
-void loop() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distanceCm = (duration * 0.0343) / 2.0;
-
-  Serial.print("TELEMETRY|DISTANCE:");
-  Serial.print(distanceCm, 1);
-  Serial.println("CM");
-
-  if (distanceCm > 0 && distanceCm < 15.0) {
-    digitalWrite(LED_PIN, HIGH);
-    tone(BUZZER_PIN, 1000);
-  } else {
-    digitalWrite(LED_PIN, LOW);
-    noTone(BUZZER_PIN);
-  }
-
-  delay(200);
-}`;
-  }
-
-  // 5. Universal Heuristic Synthesizer
+  // 3. Universal Heuristic Synthesizer for ANY prompt
   else {
-    return synthesizeCustomSensorCodeFrontend(prompt);
+    return synthesizeCustomSensorCodeFrontend(prompt, targetBoard);
   }
 
   return { success: true, title, prompt, code, wiring, componentsNeeded };
 }
 
-export function synthesizeCustomSensorCodeFrontend(prompt) {
+export function synthesizeCustomSensorCodeFrontend(prompt, targetBoard = "Arduino UNO Q") {
   const lp = prompt.toLowerCase();
   
   const cleanWords = prompt
@@ -271,10 +182,10 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
   const primaryName = cleanWords.slice(0, 3).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Custom Hardware Module';
   const tag = primaryName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 
-  let title = `Exact Arduino System for ${primaryName}`;
-  let componentsNeeded = ["Arduino UNO Q", "Breadboard", "Jumper Wires", primaryName];
-  let wiring = [`${primaryName} VCC -> 5V / 3.3V DC Power`, `${primaryName} GND -> Arduino GND Ground`];
-  let codeHeader = `/*\n * AI SENSE — ${primaryName} Precision Control Program\n * Generated for Prompt: "${prompt}"\n */\n\n`;
+  let title = `${targetBoard} Program for ${primaryName}`;
+  let componentsNeeded = [targetBoard, "Breadboard", "Jumper Wires", primaryName];
+  let wiring = [`${primaryName} VCC -> 5V / 3.3V Power Bus`, `${primaryName} GND -> Arduino GND`];
+  let codeHeader = `/*\n * AI SENSE — ${targetBoard} Target\n * Qualcomm Dragonwing QRB2210 + STM32U585 ARM Cortex-M33\n * Generated for Prompt: "${prompt}"\n */\n\n`;
   let includes = [];
   let defines = [];
   let setupBody = [];
@@ -282,15 +193,15 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
 
   const hasLCD = lp.includes('lcd') || lp.includes('16x2') || lp.includes('display');
   const hasOLED = lp.includes('oled') || lp.includes('ssd1306');
-  const hasBuzzer = lp.includes('buzzer') || lp.includes('alarm') || lp.includes('sound') || lp.includes('beep');
-  const hasRelay = lp.includes('relay') || lp.includes('pump') || lp.includes('motor') || lp.includes('fan') || lp.includes('light');
-  const hasServo = lp.includes('servo') || lp.includes('arm') || lp.includes('angle');
-  const hasLED = lp.includes('led') || lp.includes('indicator') || lp.includes('lamp');
+  const hasBuzzer = lp.includes('buzzer') || lp.includes('alarm') || lp.includes('sound');
+  const hasRelay = lp.includes('relay') || lp.includes('pump') || lp.includes('motor') || lp.includes('fan');
+  const hasServo = lp.includes('servo') || lp.includes('arm');
+  const hasLED = lp.includes('led') || lp.includes('indicator');
 
   const isI2C = lp.includes('i2c') || lp.includes('vl53l0x') || lp.includes('bmp280') || lp.includes('bme280') || lp.includes('bh1750') || lp.includes('mpu') || lp.includes('aht20') || lp.includes('ina219');
   const isSPI = lp.includes('spi') || lp.includes('rfid') || lp.includes('nrf24') || lp.includes('sd card');
   const isOneWire = lp.includes('ds18b20') || lp.includes('1-wire') || lp.includes('onewire');
-  const isAnalog = lp.includes('analog') || lp.includes('soil') || lp.includes('moisture') || lp.includes('flex') || lp.includes('force') || lp.includes('fsr') || lp.includes('ldr') || lp.includes('light') || lp.includes('rain') || lp.includes('water') || lp.includes('sound') || lp.includes('mic') || lp.includes('mq') || lp.includes('current') || lp.includes('gas') || lp.includes('smoke') || lp.includes('ph') || lp.includes('turbidity') || lp.includes('weight') || lp.includes('load cell') || lp.includes('potentiometer');
+  const isAnalog = lp.includes('analog') || lp.includes('soil') || lp.includes('moisture') || lp.includes('flex') || lp.includes('force') || lp.includes('fsr') || lp.includes('ldr') || lp.includes('light') || lp.includes('rain') || lp.includes('water') || lp.includes('mq') || lp.includes('current') || lp.includes('gas') || lp.includes('smoke') || lp.includes('ph') || lp.includes('turbidity') || lp.includes('weight') || lp.includes('load cell') || lp.includes('potentiometer');
 
   if (hasBuzzer) {
     componentsNeeded.push("Piezo Buzzer");
@@ -301,15 +212,15 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
 
   if (hasRelay) {
     componentsNeeded.push("5V Relay Module");
-    wiring.push("Relay Control IN -> Digital Pin D7", "Relay VCC -> 5V", "Relay GND -> GND");
+    wiring.push("Relay IN -> Digital Pin D7", "Relay VCC -> 5V", "Relay GND -> GND");
     defines.push("#define RELAY_PIN 7");
     setupBody.push("  pinMode(RELAY_PIN, OUTPUT);");
     setupBody.push("  digitalWrite(RELAY_PIN, LOW);");
   }
 
   if (hasLED) {
-    componentsNeeded.push("Status Indicator LED", "220Ω Resistor");
-    wiring.push("LED Anode (+) -> Digital Pin D13 via 220Ω", "LED Cathode (-) -> GND");
+    componentsNeeded.push("Status LED", "220Ω Resistor");
+    wiring.push("LED Anode -> Digital Pin D13 via 220Ω", "LED Cathode -> GND");
     defines.push("#define LED_PIN 13");
     setupBody.push("  pinMode(LED_PIN, OUTPUT);");
   }
@@ -320,7 +231,6 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
     wiring.push("Servo Signal -> Digital Pin D9", "Servo VCC -> 5V", "Servo GND -> GND");
     defines.push("Servo myServo;\n#define SERVO_PIN 9");
     setupBody.push("  myServo.attach(SERVO_PIN);");
-    setupBody.push("  myServo.write(0);");
   }
 
   if (hasLCD && !hasOLED) {
@@ -417,15 +327,68 @@ export function synthesizeCustomSensorCodeFrontend(prompt) {
   };
 }
 
-export const generateCode = async (prompt) => {
+// Call Google Gemini API directly over REST
+async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q") {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey || apiKey.trim() === "") return null;
+
   try {
-    const res = await api.post("/ai/generate", { prompt });
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const systemPrompt = `You are AI SENSE, an expert embedded AI systems engineer for ${targetBoard} Single Board Computer (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
+Generate EXACT, fully working, compilable Arduino C++ code and circuit pinouts for the prompt: "${prompt}".
+Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown formatting):
+{
+  "title": "Descriptive Title",
+  "componentsNeeded": ["Component 1", "Component 2"],
+  "wiring": ["Wire instruction 1", "Wire instruction 2"],
+  "code": "// Compilable C++ code with Serial.print TELEMETRY|...",
+  "explanation": ["Step 1", "Step 2"]
+}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: systemPrompt }] }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      let rawText = data.candidates[0].content.parts[0].text.trim();
+      if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
+      if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
+      if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
+      const parsed = JSON.parse(rawText);
+      return {
+        success: true,
+        title: parsed.title || `Arduino Program for ${prompt}`,
+        code: parsed.code,
+        wiring: parsed.wiring || [],
+        componentsNeeded: parsed.componentsNeeded || []
+      };
+    }
+  } catch (err) {
+    console.warn("Direct Gemini REST call notice:", err.message);
+  }
+  return null;
+}
+
+export const generateCode = async (prompt, targetBoard = "Arduino UNO Q") => {
+  // 1. Try Express Backend API
+  try {
+    const res = await api.post("/ai/generate", { prompt, boardTarget: targetBoard });
     if (res.data && res.data.code) {
       return res.data;
     }
   } catch (err) {
-    console.warn("Backend API call notice, using Deep Sensor Engine:", err.message);
+    console.warn("Backend API notice, switching to Gemini Client / Synthesizer:", err.message);
   }
 
-  return generateExactOrSynthesizedCodeFrontend(prompt);
+  // 2. Try Direct Google Gemini API Client
+  const geminiResult = await generateViaGeminiAPI(prompt, targetBoard);
+  if (geminiResult) return geminiResult;
+
+  // 3. Dual-Core Synthesizer Engine
+  return generateExactOrSynthesizedCodeFrontend(prompt, targetBoard);
 };
