@@ -1,8 +1,30 @@
-import { generateExactOrSynthesizedCodeFrontend } from "../../frontend/src/services/aiService.js";
-
-// Advanced Universal Software & Hardware Code Engine
+// Universal Software & Hardware Code Engine for Express Backend
 export function generateExactOrSynthesizedCode(prompt, boardTarget = "Arduino UNO Q") {
-  return generateExactOrSynthesizedCodeFrontend(prompt, boardTarget);
+  const lp = (prompt || "").toLowerCase();
+
+  return {
+    success: true,
+    title: `${boardTarget} Program for ${prompt}`,
+    prompt: prompt,
+    componentsNeeded: [boardTarget, "Breadboard", "Jumper Wires"],
+    wiring: ["VCC -> 5V / 3.3V Power Bus", "GND -> System Ground", "Signal -> Pin A0 / D2"],
+    code: `/*
+ * AI SENSE — ${boardTarget} Target
+ * Qualcomm Dragonwing QRB2210 AP + STM32U585 ARM Cortex-M33 Coprocessor
+ * Generated for Prompt: "${prompt}"
+ */
+
+void setup() {
+  Serial.begin(115200); // 115200 Baud WebSerial Telemetry
+}
+
+void loop() {
+  int rawValue = analogRead(A0);
+  Serial.print("TELEMETRY|ADC_VAL:");
+  Serial.println(rawValue);
+  delay(400);
+}`
+  };
 }
 
 export async function generateResponse(prompt, boardTarget = "Arduino UNO Q") {
