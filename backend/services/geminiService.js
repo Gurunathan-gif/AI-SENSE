@@ -1,6 +1,6 @@
 import { generateExactOrSynthesizedCodeFrontend } from "../../frontend/src/services/aiService.js";
 
-// Advanced Hardware Module Engine & Universal Synthesizer
+// Advanced Universal Software & Hardware Code Engine
 export function generateExactOrSynthesizedCode(prompt, boardTarget = "Arduino UNO Q") {
   return generateExactOrSynthesizedCodeFrontend(prompt, boardTarget);
 }
@@ -13,14 +13,22 @@ export async function generateResponse(prompt, boardTarget = "Arduino UNO Q") {
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const result = await model.generateContent(
-        `You are AI SENSE, an expert AI embedded systems engineer specializing in ${boardTarget} Single Board Computer (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
-Generate EXACT, fully working, compilable Arduino C++ code and circuit wiring for ANY user prompt: "${prompt}".
+        `You are AI SENSE, an unrestricted, expert AI Code Generator & Software/Hardware Engineer.
+The user prompt is: "${prompt}".
+Target Board/Environment: "${boardTarget}".
+
+- If the user prompt is about HARDWARE (sensors, microcontrollers, Arduino, ESP32, motors, circuits):
+  Generate complete C++ code with Serial.print("TELEMETRY|...") telemetry and circuit wiring pinouts.
+
+- If the user prompt is about SOFTWARE (Python, JavaScript, HTML/CSS, C, C++, Java, Rust, SQL, algorithms, web apps, data structures):
+  Generate the EXACT, complete, high-performance program in that requested programming language.
+
 Respond ONLY with a valid JSON object:
 {
   "title": "Descriptive Title for User's Prompt",
-  "componentsNeeded": ["Component 1", "Component 2"],
-  "wiring": ["Wire instruction 1", "Wire instruction 2"],
-  "code": "// Compilable Arduino C++ code with Serial.print TELEMETRY|...",
+  "componentsNeeded": ["Language / Hardware 1", "Dependency 2"],
+  "wiring": ["Key Feature / Wire 1", "Execution Command / Wire 2"],
+  "code": "// Complete working code in requested language",
   "explanation": ["Step 1", "Step 2"]
 }`
       );
@@ -31,13 +39,13 @@ Respond ONLY with a valid JSON object:
       const parsed = JSON.parse(text);
       return {
         success: true,
-        title: parsed.title || `${boardTarget} Program`,
+        title: parsed.title || `Program for ${prompt}`,
         code: parsed.code,
         wiring: parsed.wiring || [],
         componentsNeeded: parsed.componentsNeeded || []
       };
     } catch (err) {
-      console.warn("Gemini API call notice, using Deep Sensor Engine:", err.message);
+      console.warn("Gemini API call notice, using Deep Engine:", err.message);
     }
   }
 
