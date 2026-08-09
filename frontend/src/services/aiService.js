@@ -1,13 +1,70 @@
 import api from "../api/api";
 
-// Client-side Universal Code Generator for Software & Hardware Prompts
-export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Arduino UNO Q") {
-  const lp = prompt.toLowerCase();
+// Call Google Gemini API directly over REST (Supports user key or environment key)
+export async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q", userKey = "") {
+  const apiKey = userKey || localStorage.getItem("gemini_api_key") || import.meta.env.VITE_GEMINI_API_KEY || "";
+  
+  if (!apiKey || apiKey.trim() === "") return null;
 
-  // 1. NON-HARDWARE SOFTWARE PROMPTS (Python, JS, HTML, C, Java, Algorithms)
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
+    const systemPrompt = `You are AI SENSE, an expert AI Code Generator & Software/Hardware Engineer for ${targetBoard} (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
+User Prompt: "${prompt}".
+
+- If the user prompt is about HARDWARE (sensors, microcontrollers, Arduino, ESP32, motors, circuits):
+  Generate complete C++ code with Serial.print("TELEMETRY|...") telemetry and circuit wiring pinouts.
+
+- If the user prompt is about SOFTWARE (Python, JavaScript, HTML/CSS, C, C++, Java, Rust, SQL, algorithms, web apps, data structures):
+  Generate the EXACT, complete, high-performance program in that requested programming language.
+
+Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown formatting):
+{
+  "title": "Descriptive Title for User Prompt",
+  "componentsNeeded": ["Language / Hardware 1", "Dependency 2"],
+  "wiring": ["Key Feature / Wire 1", "Execution Command / Wire 2"],
+  "code": "// Complete working code in requested language",
+  "explanation": ["Step 1", "Step 2"]
+}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: systemPrompt }] }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+      let rawText = data.candidates[0].content.parts[0].text.trim();
+      if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
+      if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
+      if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
+      const parsed = JSON.parse(rawText);
+      return {
+        success: true,
+        source: "Google Gemini AI Engine",
+        title: parsed.title || `Program for ${prompt}`,
+        code: parsed.code,
+        wiring: parsed.wiring || [],
+        componentsNeeded: parsed.componentsNeeded || []
+      };
+    }
+  } catch (err) {
+    console.warn("Gemini REST API notice:", err.message);
+  }
+  return null;
+}
+
+// Client-side Universal Code Generator Fallback
+export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Arduino UNO Q") {
+  const lp = (prompt || "").toLowerCase();
+
+  // 1. SOFTWARE PROMPTS (Python, JS, HTML, C, Java, Algorithms)
   if (lp.includes("python") || lp.includes("def ") || lp.includes("print(") || lp.includes("pandas") || lp.includes("flask") || lp.includes("django")) {
     return {
       success: true,
+      source: "AI SENSE Code Synthesizer",
       title: "Python Program Generator",
       componentsNeeded: ["Python 3.x Environment", "Standard Libraries"],
       wiring: ["Execution: python main.py", "Dependencies: Built-in / pip"],
@@ -31,6 +88,7 @@ if __name__ == "__main__":
   if (lp.includes("html") || lp.includes("css") || lp.includes("react") || lp.includes("javascript") || lp.includes("js ") || lp.includes("web app") || lp.includes("calculator") || lp.includes("website")) {
     return {
       success: true,
+      source: "AI SENSE Code Synthesizer",
       title: "JavaScript / Web Application Code",
       componentsNeeded: ["HTML5 Engine", "Modern JavaScript (ES6+)", "CSS3 Styling"],
       wiring: ["Browser Runtime", "DOM Integration"],
@@ -64,44 +122,6 @@ if __name__ == "__main__":
   </script>
 </body>
 </html>`
-    };
-  }
-
-  if ((lp.includes("c ") || lp.includes("c++") || lp.includes("algorithm") || lp.includes("sorting") || lp.includes("binary search") || lp.includes("fibonacci") || lp.includes("array") || lp.includes("struct")) && !lp.includes("arduino") && !lp.includes("sensor")) {
-    return {
-      success: true,
-      title: "C / C++ Algorithm Program",
-      componentsNeeded: ["GCC / G++ Compiler", "Standard Library (stdio.h / iostream)"],
-      wiring: ["Compile: g++ main.cpp -o main", "Execute: ./main"],
-      code: `/*
- * AI SENSE — C++ Program & Algorithm
- * Generated for Prompt: "${prompt}"
- */
-
-#include <iostream>
-#include <vector>
-#include <algorithm>
-
-using namespace std;
-
-int main() {
-    cout << "=========================================" << endl;
-    cout << "AI SENSE C++ Program: " << "${prompt}" << endl;
-    cout << "=========================================" << endl;
-
-    vector<int> numbers = {42, 15, 88, 23, 7, 64, 91};
-    cout << "Original Array: ";
-    for (int n : numbers) cout << n << " ";
-    cout << endl;
-
-    sort(numbers.begin(), numbers.end());
-
-    cout << "Sorted Array:   ";
-    for (int n : numbers) cout << n << " ";
-    cout << endl;
-
-    return 0;
-}`
     };
   }
 
@@ -228,79 +248,31 @@ int main() {
   code += "void loop() {\n";
   code += loopBody.join("\n") + "\n}\n";
 
-  return { success: true, title, prompt, code, wiring, componentsNeeded };
+  return {
+    success: true,
+    source: "AI SENSE Code Synthesizer",
+    title,
+    prompt,
+    code,
+    wiring,
+    componentsNeeded
+  };
 }
 
-// Call Google Gemini API directly over REST for ANY prompt (Hardware or Software)
-async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q") {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-  if (!apiKey || apiKey.trim() === "") return null;
+export const generateCode = async (prompt, targetBoard = "Arduino UNO Q", userKey = "") => {
+  // 1. Try Direct Google Gemini API Client
+  const geminiResult = await generateViaGeminiAPI(prompt, targetBoard, userKey);
+  if (geminiResult) return geminiResult;
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-    const systemPrompt = `You are AI SENSE, an unrestricted, expert AI Code Generator & Systems Engineer.
-The user prompt is: "${prompt}".
-
-Target Board/Environment: "${targetBoard}".
-
-- If the user prompt is about HARDWARE (sensors, microcontrollers, Arduino, ESP32, motors, circuits):
-  Generate complete C++ code with Serial.print("TELEMETRY|...") telemetry and circuit wiring.
-
-- If the user prompt is about SOFTWARE (Python, JavaScript, HTML/CSS, C, C++, Java, Rust, SQL, algorithms, web apps, data structures):
-  Generate the EXACT, complete, high-performance program in that requested programming language.
-
-Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown formatting):
-{
-  "title": "Descriptive Title for User Prompt",
-  "componentsNeeded": ["Language/Board 1", "Dependency 2"],
-  "wiring": ["Key Feature/Wire 1", "Execution Command/Wire 2"],
-  "code": "// Complete working code in requested language",
-  "explanation": ["Step 1", "Step 2"]
-}`;
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt }] }]
-      })
-    });
-
-    const data = await res.json();
-    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-      let rawText = data.candidates[0].content.parts[0].text.trim();
-      if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
-      if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
-      if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
-      const parsed = JSON.parse(rawText);
-      return {
-        success: true,
-        title: parsed.title || `Program for ${prompt}`,
-        code: parsed.code,
-        wiring: parsed.wiring || [],
-        componentsNeeded: parsed.componentsNeeded || []
-      };
-    }
-  } catch (err) {
-    console.warn("Direct Gemini REST call notice:", err.message);
-  }
-  return null;
-}
-
-export const generateCode = async (prompt, targetBoard = "Arduino UNO Q") => {
-  // 1. Try Express Backend API
+  // 2. Try Express Backend API
   try {
     const res = await api.post("/ai/generate", { prompt, boardTarget: targetBoard });
     if (res.data && res.data.code) {
-      return res.data;
+      return { ...res.data, source: "Render Express Gemini Backend" };
     }
   } catch (err) {
-    console.warn("Backend API notice, switching to Gemini Client / Synthesizer:", err.message);
+    console.warn("Backend API notice, switching to fallback:", err.message);
   }
-
-  // 2. Try Direct Google Gemini API Client
-  const geminiResult = await generateViaGeminiAPI(prompt, targetBoard);
-  if (geminiResult) return geminiResult;
 
   // 3. Multi-Domain Universal Code Synthesizer
   return generateExactOrSynthesizedCodeFrontend(prompt, targetBoard);
