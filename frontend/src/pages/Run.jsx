@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { updateLiveTelemetry } from "../services/telemetryService";
 
@@ -8,6 +8,7 @@ export default function Run() {
   const [code, setCode] = useState(`/*
  * AI SENSE Live Hardware Monitor
  * Serial Baud Rate: 115200
+ * Board Target: Arduino UNO Q (Qualcomm QRB2210 + STM32U585)
  */
 
 #define TRIG_PIN 9
@@ -38,23 +39,60 @@ void loop() {
 
   const [serialLogs, setSerialLogs] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
+  const [isDemoActive, setIsDemoActive] = useState(false);
   const [baudRate, setBaudRate] = useState("115200");
   const [portName, setPortName] = useState("");
   const [telemetryData, setTelemetryData] = useState({});
   const [inputCommand, setInputCommand] = useState("");
+  const [connectionError, setConnectionError] = useState("");
 
   const logsEndRef = useRef(null);
   const portRef = useRef(null);
   const readerRef = useRef(null);
+  const demoIntervalRef = useRef(null);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
+  // Demo Hardware Telemetry Simulator
+  const toggleDemoMode = () => {
+    if (isDemoActive) {
+      clearInterval(demoIntervalRef.current);
+      setIsDemoActive(false);
+      setSerialLogs((prev) => [...prev, `[SYSTEM] Demo hardware telemetry stopped.`]);
+    } else {
+      setIsDemoActive(true);
+      setSerialLogs((prev) => [...prev, `[SYSTEM] Demo hardware stream started (115200 Baud simulated).`]);
+      
+      let step = 0;
+      demoIntervalRef.current = setInterval(() => {
+        step++;
+        const simulatedDistance = (15 + Math.sin(step * 0.2) * 10).toFixed(1);
+        const simulatedTemp = (24 + Math.sin(step * 0.1) * 2).toFixed(1);
+        const simulatedHum = (50 + Math.cos(step * 0.1) * 5).toFixed(1);
+        
+        const line = `TELEMETRY|DISTANCE:${simulatedDistance}CM|TEMP:${simulatedTemp}C|HUMIDITY:${simulatedHum}%`;
+        const logLine = `[${new Date().toLocaleTimeString()}] ${line}`;
+        
+        setSerialLogs((prev) => [...prev.slice(-200), logLine]);
+        
+        const parsed = {
+          DISTANCE: `${simulatedDistance}CM`,
+          TEMP: `${simulatedTemp}C`,
+          HUMIDITY: `${simulatedHum}%`
+        };
+        setTelemetryData((prev) => ({ ...prev, ...parsed }));
+        updateLiveTelemetry(parsed, line);
+      }, 1000);
+    }
+  };
+
   // WebSerial Connect Handler
   const handleConnectSerial = async () => {
+    setConnectionError("");
     if (!("serial" in navigator)) {
-      alert("WebSerial API is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
+      setConnectionError("WebSerial API is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
       return;
     }
 
@@ -64,12 +102,17 @@ void loop() {
 
       portRef.current = port;
       setIsConnected(true);
-      setPortName("Connected (WebSerial)");
+      setPortName("Connected (USB WebSerial)");
+      setSerialLogs((prev) => [...prev, `[SYSTEM] Connected to serial port at ${baudRate} Baud.`]);
 
       readSerialData(port);
     } catch (err) {
       console.error("Serial error:", err);
-      alert("Failed to connect to serial port: " + err.message);
+      if (err.name === "AccessDeniedError" || err.message.includes("locked") || err.message.includes("open")) {
+        setConnectionError("COM Port Access Denied: The serial port is currently in use by another application (e.g. Arduino IDE Serial Monitor). Please close any other terminal and retry.");
+      } else {
+        setConnectionError(`Serial Connection Error: ${err.message}`);
+      }
     }
   };
 
@@ -128,6 +171,7 @@ void loop() {
     }
     setIsConnected(false);
     setPortName("");
+    setSerialLogs((prev) => [...prev, `[SYSTEM] Serial port disconnected.`]);
   };
 
   const sendSerialCommand = async () => {
@@ -155,12 +199,24 @@ void loop() {
           <p className="text-xs text-gray-400 mt-0.5">Real-time WebSerial API hardware telemetry parser & C++ program workspace</p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <button
             onClick={() => navigate("/qc")}
             className="bg-slate-950 hover:bg-slate-800 border border-blue-500/40 text-blue-400 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
           >
             <ShieldCheck size={16} /> Analyze in QC Diagnostics <ArrowRight size={14} />
+          </button>
+
+          <button
+            onClick={toggleDemoMode}
+            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition ${
+              isDemoActive
+                ? 'bg-amber-600/20 text-amber-400 border-amber-500/40'
+                : 'bg-slate-950 text-gray-400 border-slate-800 hover:text-white'
+            }`}
+          >
+            <RefreshCw size={14} className={isDemoActive ? 'animate-spin' : ''} />
+            {isDemoActive ? 'Demo Hardware Stream Active' : 'Start Demo Stream'}
           </button>
 
           <select
@@ -186,11 +242,27 @@ void loop() {
               onClick={handleConnectSerial}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition"
             >
-              <Zap size={16} /> Connect Arduino Serial
+              <Zap size={16} /> Connect USB Serial
             </button>
           )}
         </div>
       </div>
+
+      {/* Connection Error Banner */}
+      {connectionError && (
+        <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-red-400 shrink-0" />
+            <span>{connectionError}</span>
+          </div>
+          <button
+            onClick={() => setConnectionError("")}
+            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded-lg shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6 flex-1">
@@ -232,7 +304,7 @@ void loop() {
             </div>
             {Object.keys(telemetryData).length === 0 ? (
               <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-gray-400">
-                Connect Arduino over Serial to stream telemetry...
+                Connect Arduino over Serial or click "Start Demo Stream" to parse telemetry...
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
