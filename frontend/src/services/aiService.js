@@ -1,14 +1,15 @@
 import api from "../api/api";
 
-// Call Google Gemini API directly over REST (Supports user key or environment key)
+// Call Google Gemini API directly over REST (Supports user key or environment key starting with AQ or AIza)
 export async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q", userKey = "") {
   const apiKey = userKey || localStorage.getItem("gemini_api_key") || import.meta.env.VITE_GEMINI_API_KEY || "";
   
   if (!apiKey || apiKey.trim() === "") return null;
 
-  try {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey.trim()}`;
-    const systemPrompt = `You are AI SENSE, an expert AI Code Generator & Software/Hardware Engineer for ${targetBoard} (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
+  const cleanKey = apiKey.trim();
+  const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"];
+
+  const systemPrompt = `You are AI SENSE, an expert AI Code Generator & Software/Hardware Engineer for ${targetBoard} (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
 User Prompt: "${prompt}".
 
 - If the user prompt is about HARDWARE (sensors, microcontrollers, Arduino, ESP32, motors, circuits):
@@ -26,33 +27,38 @@ Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown fo
   "explanation": ["Step 1", "Step 2"]
 }`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: systemPrompt }] }]
-      })
-    });
+  for (const modelName of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: systemPrompt }] }]
+        })
+      });
 
-    const data = await res.json();
-    if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-      let rawText = data.candidates[0].content.parts[0].text.trim();
-      if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
-      if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
-      if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
-      const parsed = JSON.parse(rawText);
-      return {
-        success: true,
-        source: "Google Gemini AI Engine",
-        title: parsed.title || `Program for ${prompt}`,
-        code: parsed.code,
-        wiring: parsed.wiring || [],
-        componentsNeeded: parsed.componentsNeeded || []
-      };
+      const data = await res.json();
+      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
+        let rawText = data.candidates[0].content.parts[0].text.trim();
+        if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
+        if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
+        if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
+        const parsed = JSON.parse(rawText);
+        return {
+          success: true,
+          source: `Google Gemini AI (${modelName})`,
+          title: parsed.title || `Program for ${prompt}`,
+          code: parsed.code,
+          wiring: parsed.wiring || [],
+          componentsNeeded: parsed.componentsNeeded || []
+        };
+      }
+    } catch (err) {
+      console.warn(`Gemini REST API notice (${modelName}):`, err.message);
     }
-  } catch (err) {
-    console.warn("Gemini REST API notice:", err.message);
   }
+
   return null;
 }
 
@@ -260,7 +266,7 @@ if __name__ == "__main__":
 }
 
 export const generateCode = async (prompt, targetBoard = "Arduino UNO Q", userKey = "") => {
-  // 1. Try Direct Google Gemini API Client
+  // 1. Try Direct Google Gemini API Client (Supports key starting with AQ... or AIza...)
   const geminiResult = await generateViaGeminiAPI(prompt, targetBoard, userKey);
   if (geminiResult) return geminiResult;
 
