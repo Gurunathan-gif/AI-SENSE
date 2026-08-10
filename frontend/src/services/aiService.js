@@ -1,6 +1,6 @@
 import api from "../api/api";
 
-// Call Google Gemini API directly over REST (Supports user key or environment key starting with AQ or AIza)
+// Call Google Gemini API directly over REST (Supports API Keys AIza... and OAuth Bearer Tokens AQ...)
 export async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q", userKey = "") {
   const apiKey = userKey || localStorage.getItem("gemini_api_key") || import.meta.env.VITE_GEMINI_API_KEY || "";
   
@@ -28,19 +28,17 @@ Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown fo
 }`;
 
   for (const modelName of models) {
+    // Attempt 1: Standard API Key URL Parameter ?key=...
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
-      const res = await fetch(url, {
+      const urlKey = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
+      const resKey = await fetch(urlKey, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: systemPrompt }] }]
-        })
+        body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
       });
-
-      const data = await res.json();
-      if (data.candidates && data.candidates[0]?.content?.parts[0]?.text) {
-        let rawText = data.candidates[0].content.parts[0].text.trim();
+      const dataKey = await resKey.json();
+      if (dataKey.candidates && dataKey.candidates[0]?.content?.parts[0]?.text) {
+        let rawText = dataKey.candidates[0].content.parts[0].text.trim();
         if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
         if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
         if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
@@ -54,8 +52,39 @@ Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown fo
           componentsNeeded: parsed.componentsNeeded || []
         };
       }
-    } catch (err) {
-      console.warn(`Gemini REST API notice (${modelName}):`, err.message);
+    } catch (e) {
+      console.warn(`Key attempt notice (${modelName}):`, e.message);
+    }
+
+    // Attempt 2: OAuth 2.0 Bearer Header (for AQ... Access Tokens)
+    try {
+      const urlBearer = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+      const resBearer = await fetch(urlBearer, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${cleanKey}`
+        },
+        body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+      });
+      const dataBearer = await resBearer.json();
+      if (dataBearer.candidates && dataBearer.candidates[0]?.content?.parts[0]?.text) {
+        let rawText = dataBearer.candidates[0].content.parts[0].text.trim();
+        if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
+        if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
+        if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
+        const parsed = JSON.parse(rawText);
+        return {
+          success: true,
+          source: `Google Gemini AI OAuth (${modelName})`,
+          title: parsed.title || `Program for ${prompt}`,
+          code: parsed.code,
+          wiring: parsed.wiring || [],
+          componentsNeeded: parsed.componentsNeeded || []
+        };
+      }
+    } catch (e) {
+      console.warn(`Bearer attempt notice (${modelName}):`, e.message);
     }
   }
 
@@ -70,7 +99,7 @@ export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Ar
   if (lp.includes("python") || lp.includes("def ") || lp.includes("print(") || lp.includes("pandas") || lp.includes("flask") || lp.includes("django")) {
     return {
       success: true,
-      source: "AI SENSE Code Synthesizer",
+      source: "AI SENSE Universal Synthesizer",
       title: "Python Program Generator",
       componentsNeeded: ["Python 3.x Environment", "Standard Libraries"],
       wiring: ["Execution: python main.py", "Dependencies: Built-in / pip"],
@@ -94,7 +123,7 @@ if __name__ == "__main__":
   if (lp.includes("html") || lp.includes("css") || lp.includes("react") || lp.includes("javascript") || lp.includes("js ") || lp.includes("web app") || lp.includes("calculator") || lp.includes("website")) {
     return {
       success: true,
-      source: "AI SENSE Code Synthesizer",
+      source: "AI SENSE Universal Synthesizer",
       title: "JavaScript / Web Application Code",
       componentsNeeded: ["HTML5 Engine", "Modern JavaScript (ES6+)", "CSS3 Styling"],
       wiring: ["Browser Runtime", "DOM Integration"],
@@ -256,7 +285,7 @@ if __name__ == "__main__":
 
   return {
     success: true,
-    source: "AI SENSE Code Synthesizer",
+    source: "AI SENSE Universal Synthesizer",
     title,
     prompt,
     code,
@@ -266,7 +295,7 @@ if __name__ == "__main__":
 }
 
 export const generateCode = async (prompt, targetBoard = "Arduino UNO Q", userKey = "") => {
-  // 1. Try Direct Google Gemini API Client (Supports key starting with AQ... or AIza...)
+  // 1. Try Direct Google Gemini API Client
   const geminiResult = await generateViaGeminiAPI(prompt, targetBoard, userKey);
   if (geminiResult) return geminiResult;
 
