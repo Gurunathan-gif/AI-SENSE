@@ -79,7 +79,7 @@ export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Ar
   const primaryName = cleanWords.slice(0, 4).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'Embedded Hardware Controller';
   const tag = primaryName.toUpperCase().replace(/[^A-Z0-9]/g, '_');
 
-  let title = `${targetBoard} — ${primaryName} Control System`;
+  let title = `${targetBoard} — ${primaryName} System`;
   let componentsNeeded = [targetBoard, "Breadboard", "Jumper Wires"];
   let wiring = [];
   let includes = [];
@@ -97,11 +97,7 @@ export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Ar
   const hasPIR = lp.includes('pir') || lp.includes('motion');
   const hasSoil = lp.includes('soil') || lp.includes('moisture');
   const hasMPU = lp.includes('mpu') || lp.includes('gyro') || lp.includes('accelerometer') || lp.includes('mpu6050');
-  const hasLoadCell = lp.includes('weight') || lp.includes('load cell') || lp.includes('hx711');
-  const hasCurrent = lp.includes('current') || lp.includes('acs712') || lp.includes('voltage');
   const hasRFID = lp.includes('rfid') || lp.includes('rc522') || lp.includes('card');
-  const hasLDR = lp.includes('ldr') || lp.includes('light') || lp.includes('lux');
-  const hasToF = lp.includes('vl53l0x') || lp.includes('tof') || lp.includes('lidar');
 
   // Actuator & Output Flags
   const hasServo = lp.includes('servo') || lp.includes('arm');
@@ -110,15 +106,10 @@ export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Ar
   const hasRelay = lp.includes('relay') || lp.includes('pump') || lp.includes('solenoid') || lp.includes('lock') || lp.includes('valve');
   const hasBuzzer = lp.includes('buzzer') || lp.includes('alarm') || lp.includes('sound') || lp.includes('beep');
   const hasLED = lp.includes('led') || lp.includes('lamp') || lp.includes('indicator');
-  const hasNeoPixel = lp.includes('neopixel') || lp.includes('ws2812') || lp.includes('rgb strip');
 
   // Display Flags
   const hasLCD = lp.includes('lcd') || lp.includes('16x2') || lp.includes('20x4');
   const hasOLED = lp.includes('oled') || lp.includes('ssd1306');
-
-  // Input Flags
-  const hasJoystick = lp.includes('joystick') || lp.includes('ps2');
-  const hasEncoder = lp.includes('encoder') || lp.includes('rotary') || lp.includes('ky040');
 
   // 1. TCS3200 Color Sensor
   if (hasColor) {
@@ -289,30 +280,34 @@ export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Ar
     setupBody.push("  display.begin(SSD1306_SWITCHCAPVCC, 0x3C); display.clearDisplay(); display.setTextSize(1); display.setTextColor(WHITE);");
   }
 
-  // FUNCTIONAL CONTROL LOGIC INJECTION
-  loopBody.push("\n  // --- Functional Control & Actuator Rule ---");
-  loopBody.push("  if (1) { // Threshold logic condition");
+  // ONLY APPEND CONTROL LOGIC IF AT LEAST ONE ACTUATOR IS PRESENT
+  const hasAnyActuator = hasServo || hasStepper || hasDCMotor || hasRelay || hasBuzzer || hasLED || hasOLED;
 
-  if (hasServo) loopBody.push("    myServo.write(90); // Rotate Servo to 90 degrees");
-  if (hasStepper) loopBody.push("    myStepper.step(512); // Rotate Stepper 90 degrees");
-  if (hasDCMotor) loopBody.push("    digitalWrite(MOTOR_IN1, HIGH); digitalWrite(MOTOR_IN2, LOW); analogWrite(MOTOR_ENA, 200); // Drive DC Motor");
-  if (hasRelay) loopBody.push("    digitalWrite(RELAY_PIN, HIGH); // Activate Relay / Solenoid Lock");
-  if (hasBuzzer) loopBody.push("    tone(BUZZER_PIN, 2000); // Sound 2kHz Alarm");
-  if (hasLED) loopBody.push("    digitalWrite(LED_PIN, HIGH);");
+  if (hasAnyActuator) {
+    loopBody.push("\n  // --- Functional Actuator Control Logic ---");
+    loopBody.push("  if (1) { // Control threshold rule");
 
-  loopBody.push("  } else {");
+    if (hasServo) loopBody.push("    myServo.write(90); // Rotate Servo to 90 degrees");
+    if (hasStepper) loopBody.push("    myStepper.step(512); // Rotate Stepper 90 degrees");
+    if (hasDCMotor) loopBody.push("    digitalWrite(MOTOR_IN1, HIGH); digitalWrite(MOTOR_IN2, LOW); analogWrite(MOTOR_ENA, 200); // Drive DC Motor");
+    if (hasRelay) loopBody.push("    digitalWrite(RELAY_PIN, HIGH); // Activate Relay / Solenoid Lock");
+    if (hasBuzzer) loopBody.push("    tone(BUZZER_PIN, 2000); // Sound 2kHz Alarm");
+    if (hasLED) loopBody.push("    digitalWrite(LED_PIN, HIGH);");
 
-  if (hasServo) loopBody.push("    myServo.write(0); // Return Servo to 0 degrees");
-  if (hasDCMotor) loopBody.push("    digitalWrite(MOTOR_IN1, LOW); digitalWrite(MOTOR_IN2, LOW); analogWrite(MOTOR_ENA, 0); // Stop Motor");
-  if (hasRelay) loopBody.push("    digitalWrite(RELAY_PIN, LOW); // Deactivate Relay");
-  if (hasBuzzer) loopBody.push("    noTone(BUZZER_PIN);");
-  if (hasLED) loopBody.push("    digitalWrite(LED_PIN, LOW);");
+    loopBody.push("  } else {");
 
-  loopBody.push("  }");
+    if (hasServo) loopBody.push("    myServo.write(0); // Return Servo to 0 degrees");
+    if (hasDCMotor) loopBody.push("    digitalWrite(MOTOR_IN1, LOW); digitalWrite(MOTOR_IN2, LOW); analogWrite(MOTOR_ENA, 0); // Stop Motor");
+    if (hasRelay) loopBody.push("    digitalWrite(RELAY_PIN, LOW); // Deactivate Relay");
+    if (hasBuzzer) loopBody.push("    noTone(BUZZER_PIN);");
+    if (hasLED) loopBody.push("    digitalWrite(LED_PIN, LOW);");
 
-  if (hasOLED) {
-    loopBody.push("  display.clearDisplay(); display.setCursor(0,0);");
-    loopBody.push(`  display.println("${primaryName.slice(0, 16)}"); display.display();`);
+    loopBody.push("  }");
+
+    if (hasOLED) {
+      loopBody.push("  display.clearDisplay(); display.setCursor(0,0);");
+      loopBody.push(`  display.println("${primaryName.slice(0, 16)}"); display.display();`);
+    }
   }
 
   loopBody.push("  Serial.println();");
