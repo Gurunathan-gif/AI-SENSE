@@ -1,35 +1,34 @@
 import api from "../api/api";
 
-// Call Google Gemini API directly over REST
+// Call Google Gemini API directly over REST (Supports AQ. and AIza... tokens)
 export async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q", userKey = "") {
   const apiKey = userKey || localStorage.getItem("gemini_api_key") || import.meta.env.VITE_GEMINI_API_KEY || "";
   
   if (!apiKey || apiKey.trim() === "") return null;
 
   const cleanKey = apiKey.trim();
-  const models = ["gemini-1.5-flash", "gemini-2.0-flash", "gemini-pro"];
+  const models = ["gemini-robotics-er-2-preview", "gemini-2.5-computer-use-preview-10-2025"];
 
-  const systemPrompt = `You are AI SENSE, a master embedded system engineer for ${targetBoard} (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
+  const systemPrompt = `You are AI SENSE, an expert AI Code Generator & Software/Hardware Engineer for ${targetBoard} (Qualcomm Dragonwing QRB2210 Quad-Core + STM32U585 ARM Cortex-M33 Dual Architecture).
 User Prompt: "${prompt}".
 
-Generate COMPLETE, COMPILABLE, PRODUCTION-READY C++ CODE for the requested sensors, electronic components, actuators, motors, displays, and controllers.
-Include:
-1. Exact C++ header libraries (#include <Wire.h>, #include <Servo.h>, #include <DHT.h>, #include <LiquidCrystal_I2C.h>, etc.).
-2. Pin definitions and wiring instructions.
-3. Full setup() and loop() functions.
-4. Logic rules connecting inputs/sensors to actuators/motors.
-5. Formatted WebSerial telemetry: Serial.print("TELEMETRY|...");
+- If the user prompt is about HARDWARE (sensors, microcontrollers, Arduino, ESP32, motors, circuits):
+  Generate complete C++ code with Serial.print("TELEMETRY|...") telemetry and circuit wiring pinouts.
 
-Respond ONLY with a valid raw JSON object (NO markdown backticks):
+- If the user prompt is about SOFTWARE (Python, JavaScript, HTML/CSS, C, C++, Java, Rust, SQL, algorithms, web apps, data structures):
+  Generate the EXACT, complete, high-performance program in that requested programming language.
+
+Respond ONLY with a valid raw JSON object (NO markdown backticks, NO markdown formatting):
 {
-  "title": "Descriptive Title",
-  "componentsNeeded": ["Component 1", "Component 2"],
-  "wiring": ["Wire instruction 1", "Wire instruction 2"],
-  "code": "// Full C++ code",
+  "title": "Descriptive Title for User Prompt",
+  "componentsNeeded": ["Language / Hardware 1", "Dependency 2"],
+  "wiring": ["Key Feature / Wire 1", "Execution Command / Wire 2"],
+  "code": "// Complete working code in requested language",
   "explanation": ["Step 1", "Step 2"]
 }`;
 
   for (const modelName of models) {
+    // Attempt 1: Standard API Key URL Parameter ?key=...
     try {
       const urlKey = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${cleanKey}`;
       const resKey = await fetch(urlKey, {
@@ -55,6 +54,37 @@ Respond ONLY with a valid raw JSON object (NO markdown backticks):
       }
     } catch (e) {
       console.warn(`Key attempt notice (${modelName}):`, e.message);
+    }
+
+    // Attempt 2: OAuth 2.0 Bearer Header
+    try {
+      const urlBearer = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
+      const resBearer = await fetch(urlBearer, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${cleanKey}`
+        },
+        body: JSON.stringify({ contents: [{ parts: [{ text: systemPrompt }] }] })
+      });
+      const dataBearer = await resBearer.json();
+      if (dataBearer.candidates && dataBearer.candidates[0]?.content?.parts[0]?.text) {
+        let rawText = dataBearer.candidates[0].content.parts[0].text.trim();
+        if (rawText.startsWith("```json")) rawText = rawText.replace(/^```json/, "");
+        if (rawText.startsWith("```")) rawText = rawText.replace(/^```/, "");
+        if (rawText.endsWith("```")) rawText = rawText.replace(/```$/, "");
+        const parsed = JSON.parse(rawText);
+        return {
+          success: true,
+          source: `Google Gemini AI OAuth (${modelName})`,
+          title: parsed.title || `Program for ${prompt}`,
+          code: parsed.code,
+          wiring: parsed.wiring || [],
+          componentsNeeded: parsed.componentsNeeded || []
+        };
+      }
+    } catch (e) {
+      console.warn(`Bearer attempt notice (${modelName}):`, e.message);
     }
   }
 
@@ -334,7 +364,7 @@ export function generateExactOrSynthesizedCodeFrontend(prompt, targetBoard = "Ar
 }
 
 export const generateCode = async (prompt, targetBoard = "Arduino UNO Q", userKey = "") => {
-  // 1. Try Direct Google Gemini API Client
+  // 1. Try Direct Google Gemini API Client (Prioritize gemini-robotics-er-2-preview)
   const geminiResult = await generateViaGeminiAPI(prompt, targetBoard, userKey);
   if (geminiResult) return geminiResult;
 
