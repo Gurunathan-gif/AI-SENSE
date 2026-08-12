@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw, Activity, Cpu, Wrench, Usb, Info, ExternalLink, XCircle } from 'lucide-react';
+import { ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw, Activity, Cpu, Wrench, Usb, Info, ExternalLink, XCircle, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { getLatestTelemetry, subscribeTelemetry } from '../services/telemetryService';
 
@@ -101,17 +101,6 @@ export default function SensorQualityChecker() {
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
-  useEffect(() => {
-    const unsubscribe = subscribeTelemetry((data) => {
-      const safeData = data || { rawLogs: [], parsedData: {}, timestamp: null };
-      setLiveStreamData(safeData);
-      if (mode === 'LIVE' && safeData.parsedData && Object.keys(safeData.parsedData).length > 0) {
-        evaluateTelemetryData(safeData.parsedData);
-      }
-    });
-    return () => unsubscribe();
-  }, [mode, selectedProfile]);
-
   const evaluateTelemetryData = (data) => {
     if (mode === 'SIMULATE_PASS') {
       setTestResult({
@@ -173,15 +162,25 @@ export default function SensorQualityChecker() {
     });
   };
 
+  // Run evaluation immediately on mount & when state changes
+  useEffect(() => {
+    evaluateTelemetryData(liveStreamData?.parsedData);
+    const unsubscribe = subscribeTelemetry((data) => {
+      const safeData = data || { rawLogs: [], parsedData: {}, timestamp: null };
+      setLiveStreamData(safeData);
+      evaluateTelemetryData(safeData.parsedData);
+    });
+    return () => unsubscribe();
+  }, [mode, selectedProfile]);
+
   const handleRunQCTest = () => {
     setTesting(true);
-    setTestResult(null);
 
     setTimeout(() => {
       const dataToUse = (mode === 'LIVE' && liveStreamData?.parsedData) ? liveStreamData.parsedData : {};
       evaluateTelemetryData(dataToUse);
       setTesting(false);
-    }, 800);
+    }, 600);
   };
 
   return (
@@ -203,7 +202,6 @@ export default function SensorQualityChecker() {
             value={mode}
             onChange={(e) => {
               setMode(e.target.value);
-              setTestResult(null);
             }}
             className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-blue-400 focus:outline-none"
           >
@@ -249,7 +247,6 @@ export default function SensorQualityChecker() {
             key={prof.id}
             onClick={() => {
               setSelectedProfile(prof);
-              setTestResult(null);
             }}
             className={`p-4 rounded-2xl border text-left transition ${
               selectedProfile.id === prof.id
@@ -297,67 +294,71 @@ export default function SensorQualityChecker() {
           </div>
         </div>
 
-        {/* Results Banner */}
+        {/* Diagnostic Verdict & Troubleshooting Cards */}
         <div className="lg:col-span-2 bg-slate-900 p-6 rounded-3xl border border-slate-800 space-y-6">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Activity className="text-blue-500" size={18} /> Quality Diagnostic Results
           </h2>
 
-          {testResult ? (
-            testResult.noBoard ? (
-              <div className="p-6 rounded-2xl bg-amber-950/30 border border-amber-500/40 text-amber-300 space-y-3">
-                <div className="flex items-center gap-3">
-                  <XCircle size={24} className="text-amber-400" />
-                  <span className="text-sm font-bold">🔌 No Physical Microcontroller Connected</span>
+          {testResult?.noBoard ? (
+            <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-4">
+              <div className="flex items-center gap-3">
+                <Usb size={24} className="text-blue-400" />
+                <div>
+                  <span className="text-sm font-bold text-white">🔌 Waiting for Physical Microcontroller USB Connection</span>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    No physical hardware serial telemetry detected. Connect your Arduino UNO Q, STM32, or ESP32 board in RUN Studio to start live inspection.
+                  </p>
                 </div>
-                <p className="text-xs text-amber-200/80 leading-relaxed">
-                  No live hardware telemetry was received over WebSerial. Plug in your Arduino UNO Q, STM32, or ESP32 board in RUN Studio to run live hardware inspection.
-                </p>
+              </div>
+              <div className="flex gap-3">
                 <Link
                   to="/run"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs transition"
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition"
                 >
                   <Usb size={14} /> Connect Microcontroller USB
                 </Link>
+                <button
+                  onClick={() => setMode('SIMULATE_PASS')}
+                  className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500 text-blue-400 font-bold text-xs transition"
+                >
+                  🟢 Run Demo Test
+                </button>
               </div>
-            ) : testResult.passed ? (
-              <div className="p-6 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 space-y-3">
-                <div className="flex items-center gap-3">
-                  <CheckCircle2 size={28} className="text-emerald-400" />
-                  <div>
-                    <div className="text-base font-extrabold text-white">VERDICT: OPTIMAL (PASSED)</div>
-                    <div className="text-xs text-emerald-400">All sensor signals match factory nominal specifications.</div>
-                  </div>
+            </div>
+          ) : testResult?.passed ? (
+            <div className="p-6 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 space-y-3">
+              <div className="flex items-center gap-3">
+                <CheckCircle2 size={28} className="text-emerald-400" />
+                <div>
+                  <div className="text-base font-extrabold text-white">VERDICT: OPTIMAL (PASSED)</div>
+                  <div className="text-xs text-emerald-400">All sensor signals match factory nominal specifications.</div>
                 </div>
               </div>
-            ) : (
-              <div className="p-6 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 space-y-4">
-                <div className="flex items-center gap-3">
-                  <AlertTriangle size={28} className="text-red-400" />
-                  <div>
-                    <div className="text-base font-extrabold text-white">VERDICT: HARDWARE FAULT DETECTED</div>
-                    <div className="text-xs text-red-400">Signal drift or component read failure detected.</div>
-                  </div>
-                </div>
-
-                <div className="pt-2 border-t border-red-500/20">
-                  <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
-                    <Wrench size={14} /> Hardware Root-Cause Troubleshooting Guide:
-                  </h4>
-                  <div className="space-y-2">
-                    {selectedProfile.debugGuide.map((g) => (
-                      <div key={g.step} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
-                        <span className="font-bold text-blue-400">Step {g.step}: {g.title}</span>
-                        <p className="text-gray-400 mt-0.5">{g.desc}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )
+            </div>
           ) : (
-            <div className="p-8 rounded-2xl bg-slate-950 border border-slate-800 text-center text-xs text-gray-500 italic">
-              Click "Run QC Diagnostic Test" or connect microcontroller USB to inspect live hardware signals...
+            <div className="p-6 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 space-y-4">
+              <div className="flex items-center gap-3">
+                <AlertTriangle size={28} className="text-red-400" />
+                <div>
+                  <div className="text-base font-extrabold text-white">VERDICT: HARDWARE FAULT DETECTED</div>
+                  <div className="text-xs text-red-400">Signal drift or component read failure detected.</div>
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-red-500/20">
+                <h4 className="text-xs font-bold text-white mb-2 flex items-center gap-2">
+                  <Wrench size={14} /> Hardware Root-Cause Troubleshooting Guide:
+                </h4>
+                <div className="space-y-2">
+                  {selectedProfile.debugGuide.map((g) => (
+                    <div key={g.step} className="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs">
+                      <span className="font-bold text-blue-400">Step {g.step}: {g.title}</span>
+                      <p className="text-gray-400 mt-0.5">{g.desc}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </div>
