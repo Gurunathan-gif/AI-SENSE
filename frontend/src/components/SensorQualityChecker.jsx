@@ -45,8 +45,8 @@ const SENSOR_QC_PROFILES = [
       { param: 'Read Interval', nominal: '2.0 sec', tolerance: 'Minimum interval' },
     ],
     evaluate: (data) => {
-      const tempStr = data.TEMP || data.TEMP_C;
-      const humStr = data.HUMIDITY;
+      const tempStr = data?.TEMP || data?.TEMP_C;
+      const humStr = data?.HUMIDITY;
       if (!tempStr && !humStr) return null;
       const temp = parseFloat((tempStr || '').replace(/[^0-9.]/g, ''));
       const hum = parseFloat((humStr || '').replace(/[^0-9.]/g, ''));
@@ -76,7 +76,7 @@ const SENSOR_QC_PROFILES = [
       { param: 'Echo Pulse', nominal: '100µs - 25000µs', tolerance: 'PulseIn timing' }
     ],
     evaluate: (data) => {
-      const distStr = data.DISTANCE || data.DISTANCE_CM;
+      const distStr = data?.DISTANCE || data?.DISTANCE_CM;
       if (!distStr) return null;
       const dist = parseFloat(distStr.replace(/[^0-9.]/g, ''));
       if (isNaN(dist)) return null;
@@ -97,15 +97,16 @@ const SENSOR_QC_PROFILES = [
 export default function SensorQualityChecker() {
   const [selectedProfile, setSelectedProfile] = useState(SENSOR_QC_PROFILES[0]);
   const [mode, setMode] = useState('LIVE');
-  const [liveStreamData, setLiveStreamData] = useState(getLatestTelemetry());
+  const [liveStreamData, setLiveStreamData] = useState(getLatestTelemetry() || { rawLogs: [], parsedData: {}, timestamp: null });
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 
   useEffect(() => {
     const unsubscribe = subscribeTelemetry((data) => {
-      setLiveStreamData(data);
-      if (mode === 'LIVE' && data.parsedData && Object.keys(data.parsedData).length > 0) {
-        evaluateTelemetryData(data.parsedData);
+      const safeData = data || { rawLogs: [], parsedData: {}, timestamp: null };
+      setLiveStreamData(safeData);
+      if (mode === 'LIVE' && safeData.parsedData && Object.keys(safeData.parsedData).length > 0) {
+        evaluateTelemetryData(safeData.parsedData);
       }
     });
     return () => unsubscribe();
@@ -177,7 +178,7 @@ export default function SensorQualityChecker() {
     setTestResult(null);
 
     setTimeout(() => {
-      const dataToUse = (mode === 'LIVE' && liveStreamData.parsedData) ? liveStreamData.parsedData : {};
+      const dataToUse = (mode === 'LIVE' && liveStreamData?.parsedData) ? liveStreamData.parsedData : {};
       evaluateTelemetryData(dataToUse);
       setTesting(false);
     }, 800);
@@ -225,13 +226,13 @@ export default function SensorQualityChecker() {
       {/* Live Hardware Status Banner */}
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3">
-          <span className={`w-2.5 h-2.5 rounded-full ${liveStreamData.timestamp ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}`} />
+          <span className={`w-2.5 h-2.5 rounded-full ${liveStreamData?.timestamp ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}`} />
           <span className="font-bold text-white">
-            {liveStreamData.timestamp ? '🟢 Live Hardware Telemetry Streaming' : '🔌 DISCONNECTED — Waiting for Physical Microcontroller USB Port'}
+            {liveStreamData?.timestamp ? '🟢 Live Hardware Telemetry Streaming' : '🔌 DISCONNECTED — Waiting for Physical Microcontroller USB Port'}
           </span>
         </div>
 
-        {!liveStreamData.timestamp && (
+        {!liveStreamData?.timestamp && (
           <Link
             to="/run"
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition"

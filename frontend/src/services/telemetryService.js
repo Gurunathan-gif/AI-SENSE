@@ -11,8 +11,8 @@ const listeners = new Set();
 
 export const updateLiveTelemetry = (parsedData, rawLine) => {
   latestTelemetry = {
-    rawLogs: rawLine ? [...latestTelemetry.rawLogs.slice(-100), `[${new Date().toLocaleTimeString()}] ${rawLine}`] : latestTelemetry.rawLogs,
-    parsedData: { ...latestTelemetry.parsedData, ...parsedData },
+    rawLogs: rawLine ? [...(latestTelemetry?.rawLogs || []).slice(-100), `[${new Date().toLocaleTimeString()}] ${rawLine}`] : (latestTelemetry?.rawLogs || []),
+    parsedData: { ...(latestTelemetry?.parsedData || {}), ...(parsedData || {}) },
     timestamp: new Date().toLocaleTimeString(),
     source: 'RUN Studio Live WebSerial Output'
   };
@@ -21,21 +21,30 @@ export const updateLiveTelemetry = (parsedData, rawLine) => {
     localStorage.setItem('aisense_latest_telemetry', JSON.stringify(latestTelemetry));
   } catch (e) {}
 
-  listeners.forEach(cb => cb(latestTelemetry));
+  listeners.forEach(cb => {
+    try { cb(latestTelemetry); } catch (e) {}
+  });
 };
 
 export const getLatestTelemetry = () => {
-  if (!latestTelemetry.timestamp) {
+  if (!latestTelemetry || !latestTelemetry.timestamp) {
     try {
       const saved = localStorage.getItem('aisense_latest_telemetry');
-      if (saved) latestTelemetry = JSON.parse(saved);
+      if (saved && saved !== 'undefined' && saved !== 'null') {
+        const parsed = JSON.parse(saved);
+        if (parsed && typeof parsed === 'object') {
+          latestTelemetry = parsed;
+        }
+      }
     } catch (e) {}
   }
-  return latestTelemetry;
+  return latestTelemetry || { rawLogs: [], parsedData: {}, timestamp: null, source: 'RUN Studio Serial Stream' };
 };
 
 export const subscribeTelemetry = (callback) => {
   listeners.add(callback);
-  callback(latestTelemetry);
+  try {
+    callback(getLatestTelemetry());
+  } catch (e) {}
   return () => listeners.delete(callback);
 };
