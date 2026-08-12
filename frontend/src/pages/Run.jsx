@@ -1,115 +1,139 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { updateLiveTelemetry } from "../services/telemetryService";
+
+// Recognized Microcontroller & Single Board Computer USB Vendor IDs (VIDs)
+const MICROCONTROLLER_USB_FILTERS = [
+  { usbVendorId: 0x2341 }, // Arduino SA (UNO Q, UNO R3, Mega, Nano)
+  { usbVendorId: 0x2A03 }, // Arduino.org
+  { usbVendorId: 0x05C6 }, // Qualcomm Inc (Arduino UNO Q / Dragonwing QRB2210 AP)
+  { usbVendorId: 0x0483 }, // STMicroelectronics (STM32U585 / ST-Link Coprocessor)
+  { usbVendorId: 0x303A }, // Espressif Systems (ESP32 / ESP32-S3 / ESP32-C3)
+  { usbVendorId: 0x10C4 }, // Silicon Labs CP210x (ESP32 / NodeMCU Serial Bridge)
+  { usbVendorId: 0x1A86 }, // QinHeng CH340 / CH341 (Arduino / ESP32 Serial Bridge)
+  { usbVendorId: 0x0403 }, // FTDI FT232R Transceiver
+  { usbVendorId: 0x2E8A }, // Raspberry Pi Ltd (Raspberry Pi Pico / RP2040)
+  { usbVendorId: 0x16C0 }  // PJRC Teensy
+];
 
 export default function Run() {
   const navigate = useNavigate();
   const [code, setCode] = useState(`/*
  * AI SENSE Live Hardware Monitor
  * Serial Baud Rate: 115200
- * Board Target: Arduino UNO Q (Qualcomm QRB2210 + STM32U585)
+ * Target: Arduino UNO Q (Qualcomm QRB2210 AP + STM32U585 Coprocessor)
  */
-
-#define TRIG_PIN 9
-#define ECHO_PIN 10
 
 void setup() {
   Serial.begin(115200);
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
 }
 
 void loop() {
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distance = (duration * 0.0343) / 2.0;
-
-  Serial.print("TELEMETRY|DISTANCE:");
-  Serial.print(distance, 1);
-  Serial.println("CM");
-
-  delay(500);
+  // Telemetry stream will display here once physical microcontroller is connected
 }`);
 
   const [serialLogs, setSerialLogs] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
-  const [isDemoActive, setIsDemoActive] = useState(false);
   const [baudRate, setBaudRate] = useState("115200");
-  const [portName, setPortName] = useState("");
+  const [hardwareInfo, setHardwareInfo] = useState(null);
   const [telemetryData, setTelemetryData] = useState({});
   const [inputCommand, setInputCommand] = useState("");
   const [connectionError, setConnectionError] = useState("");
+  const [deviceWarning, setDeviceWarning] = useState("");
 
   const logsEndRef = useRef(null);
   const portRef = useRef(null);
   const readerRef = useRef(null);
-  const demoIntervalRef = useRef(null);
+
+  // Check if AI Chat transferred code to RUN Studio
+  useEffect(() => {
+    const transferredCode = localStorage.getItem("aisense_current_code");
+    if (transferredCode) {
+      setCode(transferredCode);
+      localStorage.removeItem("aisense_current_code");
+    }
+  }, []);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
-  // Demo Hardware Telemetry Simulator
-  const toggleDemoMode = () => {
-    if (isDemoActive) {
-      clearInterval(demoIntervalRef.current);
-      setIsDemoActive(false);
-      setSerialLogs((prev) => [...prev, `[SYSTEM] Demo hardware telemetry stopped.`]);
-    } else {
-      setIsDemoActive(true);
-      setSerialLogs((prev) => [...prev, `[SYSTEM] Demo hardware stream started (115200 Baud simulated).`]);
-      
-      let step = 0;
-      demoIntervalRef.current = setInterval(() => {
-        step++;
-        const simulatedDistance = (15 + Math.sin(step * 0.2) * 10).toFixed(1);
-        const simulatedTemp = (24 + Math.sin(step * 0.1) * 2).toFixed(1);
-        const simulatedHum = (50 + Math.cos(step * 0.1) * 5).toFixed(1);
-        
-        const line = `TELEMETRY|DISTANCE:${simulatedDistance}CM|TEMP:${simulatedTemp}C|HUMIDITY:${simulatedHum}%`;
-        const logLine = `[${new Date().toLocaleTimeString()}] ${line}`;
-        
-        setSerialLogs((prev) => [...prev.slice(-200), logLine]);
-        
-        const parsed = {
-          DISTANCE: `${simulatedDistance}CM`,
-          TEMP: `${simulatedTemp}C`,
-          HUMIDITY: `${simulatedHum}%`
-        };
-        setTelemetryData((prev) => ({ ...prev, ...parsed }));
-        updateLiveTelemetry(parsed, line);
-      }, 1000);
+  // Identify Vendor ID name
+  const identifyMicrocontrollerBoard = (vid) => {
+    switch (vid) {
+      case 0x2341:
+      case 0x2A03:
+        return "Arduino UNO Q / Official Arduino Board";
+      case 0x05C6:
+        return "Qualcomm Dragonwing QRB2210 AP (Arduino UNO Q)";
+      case 0x0483:
+        return "STM32U585 ARM Cortex-M33 Coprocessor";
+      case 0x303A:
+        return "Espressif ESP32 Microcontroller";
+      case 0x10C4:
+        return "Silicon Labs CP210x USB Bridge (ESP32 / NodeMCU)";
+      case 0x1A86:
+        return "WCH CH340 USB-Serial Transceiver (Arduino / ESP)";
+      case 0x0403:
+        return "FTDI FT232R USB Transceiver";
+      case 0x2E8A:
+        return "Raspberry Pi Pico (RP2040)";
+      default:
+        return "Generic USB Microcontroller";
     }
   };
 
-  // WebSerial Connect Handler
+  // WebSerial Connect Handler with Hardware Port Verification
   const handleConnectSerial = async () => {
     setConnectionError("");
+    setDeviceWarning("");
+
     if (!("serial" in navigator)) {
       setConnectionError("WebSerial API is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
       return;
     }
 
     try {
-      const port = await navigator.serial.requestPort();
+      // Filter WebSerial USB picker to only show recognized microcontrollers
+      const port = await navigator.serial.requestPort({
+        filters: MICROCONTROLLER_USB_FILTERS
+      });
+
+      const info = port.getInfo();
+      const vid = info.usbVendorId;
+      const pid = info.usbProductId;
+
+      // Verify if device is a valid microcontroller
+      const isValidMicrocontroller = vid && MICROCONTROLLER_USB_FILTERS.some(f => f.usbVendorId === vid);
+
+      if (!isValidMicrocontroller && vid !== undefined) {
+        setDeviceWarning(`Device Rejected: Selected USB device (Vendor ID: 0x${vid.toString(16).toUpperCase()}) is not a recognized microcontroller or single-board computer processor.`);
+        return;
+      }
+
       await port.open({ baudRate: parseInt(baudRate, 10) });
+
+      const boardName = vid ? identifyMicrocontrollerBoard(vid) : "Connected Microcontroller";
+      const hexVid = vid ? `0x${vid.toString(16).toUpperCase()}` : "N/A";
+      const hexPid = pid ? `0x${pid.toString(16).toUpperCase()}` : "N/A";
 
       portRef.current = port;
       setIsConnected(true);
-      setPortName("Connected (USB WebSerial)");
-      setSerialLogs((prev) => [...prev, `[SYSTEM] Connected to serial port at ${baudRate} Baud.`]);
+      setHardwareInfo({ boardName, hexVid, hexPid });
+
+      setSerialLogs((prev) => [
+        ...prev,
+        `[SYSTEM] 🟢 Hardware Verified: ${boardName} (VID: ${hexVid}, PID: ${hexPid}) connected at ${baudRate} Baud.`
+      ]);
 
       readSerialData(port);
     } catch (err) {
-      console.error("Serial error:", err);
+      console.error("Serial connection error:", err);
       if (err.name === "AccessDeniedError" || err.message.includes("locked") || err.message.includes("open")) {
         setConnectionError("COM Port Access Denied: The serial port is currently in use by another application (e.g. Arduino IDE Serial Monitor). Please close any other terminal and retry.");
+      } else if (err.name === "NotFoundError" || err.message.includes("selected")) {
+        setConnectionError("No hardware device selected. Please connect your Arduino UNO Q, STM32, or ESP32 board.");
       } else {
         setConnectionError(`Serial Connection Error: ${err.message}`);
       }
@@ -149,7 +173,7 @@ void loop() {
                 setTelemetryData((prev) => ({ ...prev, ...parsed }));
               }
 
-              // Interconnect live telemetry output with QC Diagnostics
+              // Interconnect live hardware serial telemetry output with QC Diagnostics
               updateLiveTelemetry(parsed, cleanLine);
             }
           }
@@ -170,7 +194,8 @@ void loop() {
       console.error(e);
     }
     setIsConnected(false);
-    setPortName("");
+    setHardwareInfo(null);
+    setTelemetryData({});
     setSerialLogs((prev) => [...prev, `[SYSTEM] Serial port disconnected.`]);
   };
 
@@ -196,7 +221,7 @@ void loop() {
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
             <Activity /> RUN Hardware Studio & Serial Monitor
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Real-time WebSerial API hardware telemetry parser & C++ program workspace</p>
+          <p className="text-xs text-gray-400 mt-0.5">Strict hardware USB port verification & WebSerial live telemetry monitor</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -205,18 +230,6 @@ void loop() {
             className="bg-slate-950 hover:bg-slate-800 border border-blue-500/40 text-blue-400 text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
           >
             <ShieldCheck size={16} /> Analyze in QC Diagnostics <ArrowRight size={14} />
-          </button>
-
-          <button
-            onClick={toggleDemoMode}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 border transition ${
-              isDemoActive
-                ? 'bg-amber-600/20 text-amber-400 border-amber-500/40'
-                : 'bg-slate-950 text-gray-400 border-slate-800 hover:text-white'
-            }`}
-          >
-            <RefreshCw size={14} className={isDemoActive ? 'animate-spin' : ''} />
-            {isDemoActive ? 'Demo Hardware Stream Active' : 'Start Demo Stream'}
           </button>
 
           <select
@@ -235,29 +248,66 @@ void loop() {
               onClick={handleDisconnectSerial}
               className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"
             >
-              Disconnect Serial
+              Disconnect Hardware Port
             </button>
           ) : (
             <button
               onClick={handleConnectSerial}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg shadow-blue-600/20"
             >
-              <Zap size={16} /> Connect USB Serial
+              <Zap size={16} /> Connect Microcontroller USB
             </button>
           )}
         </div>
       </div>
 
-      {/* Connection Error Banner */}
-      {connectionError && (
+      {/* Hardware Connection Status Bar */}
+      {hardwareInfo ? (
+        <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
+            <div>
+              <span className="font-extrabold text-white">{hardwareInfo.boardName}</span> — Connected & Verified (VID: <code className="text-emerald-400">{hardwareInfo.hexVid}</code>, PID: <code className="text-emerald-400">{hardwareInfo.hexPid}</code>)
+            </div>
+          </div>
+          <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
+            Physical USB Hardware Port Active
+          </span>
+        </div>
+      ) : (
+        <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-gray-400 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <Usb size={20} className="text-blue-500 shrink-0 animate-pulse" />
+            <span>🔌 <strong>No Physical Microcontroller Connected</strong> — Plug in your Arduino UNO Q, STM32, ESP32, or processor board and click <strong>"Connect Microcontroller USB"</strong>.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Connection Warning Banners */}
+      {deviceWarning && (
         <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle size={20} className="text-red-400 shrink-0" />
+            <XCircle size={20} className="text-red-400 shrink-0" />
+            <span>{deviceWarning}</span>
+          </div>
+          <button
+            onClick={() => setDeviceWarning("")}
+            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded-lg shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {connectionError && (
+        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <AlertTriangle size={20} className="text-amber-400 shrink-0" />
             <span>{connectionError}</span>
           </div>
           <button
             onClick={() => setConnectionError("")}
-            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded-lg shrink-0"
+            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shrink-0"
           >
             Dismiss
           </button>
@@ -266,52 +316,55 @@ void loop() {
 
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6 flex-1">
-        {/* Left 2 Cols: Code Editor */}
+        {/* Left 2 Cols: Code Editor Workspace */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden">
           <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex justify-between items-center">
-            <span className="text-xs font-bold text-blue-400 uppercase tracking-wider">C++ Code Editor</span>
+            <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
+              <Cpu size={14} /> C++ Code Workspace (Transferred from AI Chat)
+            </span>
             <button
               onClick={() => {
                 navigator.clipboard.writeText(code);
-                alert("Code copied!");
+                alert("Code copied to clipboard!");
               }}
               className="text-xs font-bold text-gray-400 hover:text-white"
             >
-              Copy
+              Copy Workspace Code
             </button>
           </div>
           <textarea
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            className="flex-1 bg-slate-950 p-5 outline-none font-mono text-xs text-green-400 min-h-[350px] leading-relaxed"
+            className="flex-1 bg-slate-950 p-5 outline-none font-mono text-xs text-green-400 min-h-[380px] leading-relaxed"
           />
         </div>
 
-        {/* Right Col: Live Telemetry & Serial Monitor */}
+        {/* Right Col: Real Hardware Telemetry & Serial Monitor */}
         <div className="space-y-6 flex flex-col">
           {/* Live Telemetry Display */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
-                <Activity className="text-blue-500" size={16} /> Real-Time Telemetry Dashboard
+                <Activity className="text-blue-500" size={16} /> Real-Time Telemetry Stream
               </h3>
               <button
                 onClick={() => navigate("/qc")}
                 className="text-[10px] font-bold text-blue-400 hover:underline flex items-center gap-1"
               >
-                QC Test <ArrowRight size={12} />
+                QC Diagnostics <ArrowRight size={12} />
               </button>
             </div>
+
             {Object.keys(telemetryData).length === 0 ? (
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-gray-400">
-                Connect Arduino over Serial or click "Start Demo Stream" to parse telemetry...
+              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-gray-500 italic text-center">
+                🔌 Disconnected — Connect physical microcontroller USB to view live telemetry...
               </div>
             ) : (
               <div className="grid grid-cols-2 gap-2">
                 {Object.entries(telemetryData).map(([key, val], i) => (
                   <div key={i} className="p-3 rounded-xl bg-slate-950 border border-blue-500/20">
                     <div className="text-[10px] uppercase font-bold text-gray-400">{key}</div>
-                    <div className="text-sm font-extrabold text-blue-400 mt-0.5">{val}</div>
+                    <div className="text-sm font-extrabold text-emerald-400 mt-0.5">{val}</div>
                   </div>
                 ))}
               </div>
@@ -322,19 +375,19 @@ void loop() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden">
             <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex justify-between items-center">
               <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                <Terminal size={14} /> Serial Terminal Console
+                <Terminal size={14} /> Serial Terminal Output
               </span>
               <button
                 onClick={() => setSerialLogs([])}
                 className="text-[10px] text-gray-400 hover:text-white font-bold"
               >
-                Clear
+                Clear Terminal
               </button>
             </div>
 
             <div className="flex-1 bg-slate-950 p-4 font-mono text-xs text-green-400 overflow-y-auto max-h-[250px] space-y-1">
               {serialLogs.length === 0 ? (
-                <div className="text-gray-500 italic">Waiting for serial output...</div>
+                <div className="text-gray-600 italic">Waiting for physical microcontroller serial output...</div>
               ) : (
                 serialLogs.map((log, idx) => <div key={idx}>{log}</div>)
               )}
@@ -350,7 +403,7 @@ void loop() {
                   if (e.key === "Enter") sendSerialCommand();
                 }}
                 disabled={!isConnected}
-                placeholder={isConnected ? "Type command & press Enter..." : "Connect serial to send commands..."}
+                placeholder={isConnected ? "Type command & press Enter..." : "Connect hardware port to send commands..."}
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-blue-500"
               />
               <button

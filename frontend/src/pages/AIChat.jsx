@@ -1,12 +1,13 @@
 import { useState, useRef, useEffect } from "react";
-import { useLocation } from "react-router-dom";
-import { Send, Bot, User, Copy, Save, Trash2, Sparkles, Zap, Cpu, Layers, Key, CheckCircle2, Server } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Send, Bot, User, Copy, Save, Trash2, Sparkles, Zap, Cpu, Layers, Key, CheckCircle2, Server, Activity, ArrowRight } from "lucide-react";
 import { generateCode } from "../services/aiService";
 import { saveProject } from "../services/projectService";
 import { ALL_100_SENSORS } from "../components/SensorLibrary";
 
 export default function AIChat() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -74,6 +75,12 @@ export default function AIChat() {
   const copyCode = (code) => {
     navigator.clipboard.writeText(code);
     alert("Code copied to clipboard!");
+  };
+
+  const sendToRunStudio = (codeToRun) => {
+    localStorage.setItem("aisense_current_code", codeToRun);
+    alert("Code moved to RUN Hardware Studio & QC Workspace! Redirecting to hardware monitor...");
+    navigate("/run");
   };
 
   const saveCurrentProject = async (msg) => {
@@ -302,16 +309,24 @@ export default function AIChat() {
                       </div>
                     )}
 
-                    <div className="flex gap-3 pt-2">
+                    <div className="flex flex-wrap gap-3 pt-2">
+                      <button
+                        onClick={() => sendToRunStudio(msg.code)}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-xs font-extrabold flex items-center gap-2 transition shadow-lg shadow-emerald-600/20"
+                      >
+                        <Activity size={16} /> Move Code to RUN Studio & Hardware QC <ArrowRight size={14} />
+                      </button>
+
                       <button
                         onClick={() => copyCode(msg.code)}
-                        className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition"
+                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition border border-slate-700"
                       >
                         <Copy size={16} /> Copy Code
                       </button>
+
                       <button
                         onClick={() => saveCurrentProject(msg)}
-                        className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition"
                       >
                         <Save size={16} /> Save to Cloud
                       </button>
