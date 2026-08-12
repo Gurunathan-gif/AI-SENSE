@@ -1,4 +1,4 @@
-import api from "../api/api";
+import api from "../api/api.js";
 
 // Call Google Gemini API directly over REST (Supports AQ. and AIza... tokens)
 export async function generateViaGeminiAPI(prompt, targetBoard = "Arduino UNO Q", userKey = "") {
