@@ -7,6 +7,7 @@ import authRoutes from "./routes/authRoutes.js";
 import aiRoutes from "./routes/aiRoutes.js";
 import projectRoutes from "./routes/projectRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import hardwareRoutes from "./routes/hardwareRoutes.js";
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/hardware", hardwareRoutes);
 
 // 404 Handler
 app.use((req, res) => {
@@ -50,6 +52,7 @@ function startServer(portToUse) {
     console.log(`🚀 AI SENSE Backend Server running on port ${portToUse}`);
     console.log(`📡 Health Check: http://localhost:${portToUse}/`);
     console.log(`🤖 AI Route: POST http://localhost:${portToUse}/api/ai/generate`);
+    console.log(`⚙️ Hardware Route: GET http://localhost:${portToUse}/api/hardware/boards`);
     console.log(`=================================================`);
   });
 

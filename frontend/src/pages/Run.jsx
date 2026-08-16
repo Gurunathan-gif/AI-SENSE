@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { updateLiveTelemetry } from "../services/telemetryService";
+import { compileHardwareSketch, uploadHardwareSketch, fetchConnectedBoards, getHardwareStatus } from "../services/hardwareService";
 
 // Recognized Microcontroller & Single Board Computer USB Vendor IDs (VIDs)
 const MICROCONTROLLER_USB_FILTERS = [
@@ -15,6 +16,16 @@ const MICROCONTROLLER_USB_FILTERS = [
   { usbVendorId: 0x0403 }, // FTDI FT232R Transceiver
   { usbVendorId: 0x2E8A }, // Raspberry Pi Ltd (Raspberry Pi Pico / RP2040)
   { usbVendorId: 0x16C0 }  // PJRC Teensy
+];
+
+const POPULAR_BOARDS = [
+  { label: "Arduino UNO Q (32-Bit ARM + QRB2210)", fqbn: "arduino:samd:nano_33_iot" },
+  { label: "Arduino UNO R3", fqbn: "arduino:avr:uno" },
+  { label: "Arduino Nano", fqbn: "arduino:avr:nano" },
+  { label: "Arduino Mega 2560", fqbn: "arduino:avr:mega" },
+  { label: "ESP32 Dev Module", fqbn: "esp32:esp32:esp32" },
+  { label: "Raspberry Pi Pico (RP2040)", fqbn: "rp2040:rp2040:pico" },
+  { label: "STM32F4 / STM32U5 Series", fqbn: "STMicroelectronics:STM32:GenSTM32" },
 ];
 
 export default function Run() {
@@ -42,6 +53,13 @@ void loop() {
   const [connectionError, setConnectionError] = useState("");
   const [deviceWarning, setDeviceWarning] = useState("");
 
+  // Arduino CLI State
+  const [selectedFqbn, setSelectedFqbn] = useState("arduino:avr:uno");
+  const [targetPort, setTargetPort] = useState("COM3");
+  const [isCompiling, setIsCompiling] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [cliStatus, setCliStatus] = useState(null);
+
   const logsEndRef = useRef(null);
   const portRef = useRef(null);
   const readerRef = useRef(null);
@@ -53,6 +71,13 @@ void loop() {
       setCode(transferredCode);
       localStorage.removeItem("aisense_current_code");
     }
+
+    // Check Arduino CLI toolchain status on backend
+    getHardwareStatus().then((res) => {
+      if (res && res.arduinoCli) {
+        setCliStatus(res.arduinoCli);
+      }
+    });
   }, []);
 
   useEffect(() => {
@@ -82,6 +107,64 @@ void loop() {
       default:
         return "Generic USB Microcontroller";
     }
+  };
+
+  // Compile Sketch via Arduino CLI Backend Endpoint
+  const handleCompileArduinoCli = async () => {
+    setIsCompiling(true);
+    setSerialLogs((prev) => [
+      ...prev,
+      `[ARDUINO-CLI] ⚙️ Starting C++ compilation for target FQBN: ${selectedFqbn}...`
+    ]);
+
+    try {
+      const res = await compileHardwareSketch(code, selectedFqbn);
+      if (res.success) {
+        setSerialLogs((prev) => [
+          ...prev,
+          `[ARDUINO-CLI] 🟢 COMPILATION PASSED!`,
+          ...(res.output ? res.output.split("\n") : [])
+        ]);
+      } else {
+        setSerialLogs((prev) => [
+          ...prev,
+          `[ARDUINO-CLI] 🔴 COMPILATION ERROR:`,
+          ...(res.output ? res.output.split("\n") : [res.error || "Unknown compilation error."])
+        ]);
+      }
+    } catch (err) {
+      setSerialLogs((prev) => [...prev, `[ARDUINO-CLI] 🔴 Error: ${err.message}`]);
+    }
+    setIsCompiling(false);
+  };
+
+  // Upload Sketch via Arduino CLI Backend Endpoint
+  const handleUploadArduinoCli = async () => {
+    setIsUploading(true);
+    setSerialLogs((prev) => [
+      ...prev,
+      `[ARDUINO-CLI] ⚡ Initiating upload to Port: ${targetPort} (FQBN: ${selectedFqbn})...`
+    ]);
+
+    try {
+      const res = await uploadHardwareSketch(code, selectedFqbn, targetPort);
+      if (res.success) {
+        setSerialLogs((prev) => [
+          ...prev,
+          `[ARDUINO-CLI] 🟢 UPLOAD SUCCESSFUL! Code flashed to ${targetPort}.`,
+          ...(res.output ? res.output.split("\n") : [])
+        ]);
+      } else {
+        setSerialLogs((prev) => [
+          ...prev,
+          `[ARDUINO-CLI] 🔴 UPLOAD FAILED:`,
+          ...(res.output ? res.output.split("\n") : [res.error || "Upload failed."])
+        ]);
+      }
+    } catch (err) {
+      setSerialLogs((prev) => [...prev, `[ARDUINO-CLI] 🔴 Error: ${err.message}`]);
+    }
+    setIsUploading(false);
   };
 
   // WebSerial Connect Handler with Hardware Port Verification
@@ -219,9 +302,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Hardware Studio & Serial Monitor
+            <Activity /> RUN Hardware Studio & Arduino CLI Toolchain
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Strict hardware USB port verification & WebSerial live telemetry monitor</p>
+          <p className="text-xs text-gray-400 mt-0.5">Arduino CLI C++ Compile & Flash engine + WebSerial live telemetry monitor</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -255,9 +338,58 @@ void loop() {
               onClick={handleConnectSerial}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg shadow-blue-600/20"
             >
-              <Zap size={16} /> Connect Microcontroller USB
+              <Zap size={16} /> Connect WebSerial Monitor
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Arduino CLI Compilation & Flash Action Controls */}
+      <div className="bg-slate-900 border border-blue-500/30 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4 flex-1">
+          <div>
+            <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Target Microcontroller FQBN</label>
+            <select
+              value={selectedFqbn}
+              onChange={(e) => setSelectedFqbn(e.target.value)}
+              className="bg-slate-950 border border-slate-800 text-xs font-semibold text-white rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500"
+            >
+              {POPULAR_BOARDS.map((b, idx) => (
+                <option key={idx} value={b.fqbn}>{b.label} ({b.fqbn})</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Target Hardware Port</label>
+            <input
+              type="text"
+              value={targetPort}
+              onChange={(e) => setTargetPort(e.target.value)}
+              placeholder="e.g. COM3, COM4, /dev/ttyACM0"
+              className="bg-slate-950 border border-slate-800 text-xs font-mono text-blue-400 rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 w-44"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            onClick={handleCompileArduinoCli}
+            disabled={isCompiling}
+            className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
+          >
+            {isCompiling ? <RefreshCw className="animate-spin" size={14} /> : <Code size={14} />}
+            {isCompiling ? "Compiling..." : "⚙️ Compile Sketch (Arduino CLI)"}
+          </button>
+
+          <button
+            onClick={handleUploadArduinoCli}
+            disabled={isUploading}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-600/20"
+          >
+            {isUploading ? <RefreshCw className="animate-spin" size={14} /> : <Upload size={14} />}
+            {isUploading ? "Flashing Code..." : "⚡ Flash to Board (Arduino CLI)"}
+          </button>
         </div>
       </div>
 
@@ -278,7 +410,7 @@ void loop() {
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-gray-400 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Usb size={20} className="text-blue-500 shrink-0 animate-pulse" />
-            <span>🔌 <strong>No Physical Microcontroller Connected</strong> — Plug in your Arduino UNO Q, STM32, ESP32, or processor board and click <strong>"Connect Microcontroller USB"</strong>.</span>
+            <span>🔌 <strong>No WebSerial Stream Active</strong> — Plug in your Arduino UNO Q, STM32, ESP32, or processor board and click <strong>"Connect WebSerial Monitor"</strong> or compile using <strong>Arduino CLI</strong>.</span>
           </div>
         </div>
       )}
@@ -375,7 +507,7 @@ void loop() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden">
             <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex justify-between items-center">
               <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                <Terminal size={14} /> Serial Terminal Output
+                <Terminal size={14} /> Serial Terminal & Arduino CLI Build Logs
               </span>
               <button
                 onClick={() => setSerialLogs([])}
@@ -387,7 +519,7 @@ void loop() {
 
             <div className="flex-1 bg-slate-950 p-4 font-mono text-xs text-green-400 overflow-y-auto max-h-[250px] space-y-1">
               {serialLogs.length === 0 ? (
-                <div className="text-gray-600 italic">Waiting for physical microcontroller serial output...</div>
+                <div className="text-gray-600 italic">Waiting for physical microcontroller serial output or Arduino CLI build logs...</div>
               ) : (
                 serialLogs.map((log, idx) => <div key={idx}>{log}</div>)
               )}
