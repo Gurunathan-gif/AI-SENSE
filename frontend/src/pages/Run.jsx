@@ -1,22 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { updateLiveTelemetry } from "../services/telemetryService";
-import { compileHardwareSketch, uploadHardwareSketch, fetchConnectedBoards, getHardwareStatus } from "../services/hardwareService";
-
-// Recognized Microcontroller & Single Board Computer USB Vendor IDs (VIDs)
-const MICROCONTROLLER_USB_FILTERS = [
-  { usbVendorId: 0x2341 }, // Arduino SA (UNO Q, UNO R3, Mega, Nano)
-  { usbVendorId: 0x2A03 }, // Arduino.org
-  { usbVendorId: 0x05C6 }, // Qualcomm Inc (Arduino UNO Q / Dragonwing QRB2210 AP)
-  { usbVendorId: 0x0483 }, // STMicroelectronics (STM32U585 / ST-Link Coprocessor)
-  { usbVendorId: 0x303A }, // Espressif Systems (ESP32 / ESP32-S3 / ESP32-C3)
-  { usbVendorId: 0x10C4 }, // Silicon Labs CP210x (ESP32 / NodeMCU Serial Bridge)
-  { usbVendorId: 0x1A86 }, // QinHeng CH340 / CH341 (Arduino / ESP32 Serial Bridge)
-  { usbVendorId: 0x0403 }, // FTDI FT232R Transceiver
-  { usbVendorId: 0x2E8A }, // Raspberry Pi Ltd (Raspberry Pi Pico / RP2040)
-  { usbVendorId: 0x16C0 }  // PJRC Teensy
-];
+import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
+import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
   { label: "Arduino UNO Q (32-Bit ARM + QRB2210)", fqbn: "arduino:samd:nano_33_iot" },
@@ -44,25 +30,30 @@ void loop() {
   // Telemetry stream will display here once physical microcontroller is connected
 }`);
 
-  const [serialLogs, setSerialLogs] = useState([]);
-  const [isConnected, setIsConnected] = useState(false);
-  const [baudRate, setBaudRate] = useState("115200");
-  const [hardwareInfo, setHardwareInfo] = useState(null);
-  const [telemetryData, setTelemetryData] = useState({});
-  const [inputCommand, setInputCommand] = useState("");
-  const [connectionError, setConnectionError] = useState("");
-  const [deviceWarning, setDeviceWarning] = useState("");
+  const {
+    isConnected,
+    hardwareInfo,
+    telemetryData,
+    serialLogs,
+    connectionError,
+    deviceWarning,
+    baudRate,
+    setBaudRate,
+    connectHardwarePort,
+    disconnectHardwarePort,
+    sendSerialCommand,
+    clearSerialLogs,
+    setConnectionError,
+    setDeviceWarning
+  } = useHardware();
 
-  // Arduino CLI State
+  const [inputCommand, setInputCommand] = useState("");
   const [selectedFqbn, setSelectedFqbn] = useState("arduino:avr:uno");
   const [targetPort, setTargetPort] = useState("COM3");
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
-  const [cliStatus, setCliStatus] = useState(null);
 
   const logsEndRef = useRef(null);
-  const portRef = useRef(null);
-  const readerRef = useRef(null);
 
   // Check if AI Chat transferred code to RUN Studio
   useEffect(() => {
@@ -71,69 +62,22 @@ void loop() {
       setCode(transferredCode);
       localStorage.removeItem("aisense_current_code");
     }
-
-    // Check Arduino CLI toolchain status on backend
-    getHardwareStatus().then((res) => {
-      if (res && res.arduinoCli) {
-        setCliStatus(res.arduinoCli);
-      }
-    });
   }, []);
 
   useEffect(() => {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
-  // Identify Vendor ID name
-  const identifyMicrocontrollerBoard = (vid) => {
-    switch (vid) {
-      case 0x2341:
-      case 0x2A03:
-        return "Arduino UNO Q / Official Arduino Board";
-      case 0x05C6:
-        return "Qualcomm Dragonwing QRB2210 AP (Arduino UNO Q)";
-      case 0x0483:
-        return "STM32U585 ARM Cortex-M33 Coprocessor";
-      case 0x303A:
-        return "Espressif ESP32 Microcontroller";
-      case 0x10C4:
-        return "Silicon Labs CP210x USB Bridge (ESP32 / NodeMCU)";
-      case 0x1A86:
-        return "WCH CH340 USB-Serial Transceiver (Arduino / ESP)";
-      case 0x0403:
-        return "FTDI FT232R USB Transceiver";
-      case 0x2E8A:
-        return "Raspberry Pi Pico (RP2040)";
-      default:
-        return "Generic USB Microcontroller";
-    }
-  };
-
   // Compile Sketch via Arduino CLI Backend Endpoint
   const handleCompileArduinoCli = async () => {
     setIsCompiling(true);
-    setSerialLogs((prev) => [
-      ...prev,
-      `[ARDUINO-CLI] ⚙️ Starting C++ compilation for target FQBN: ${selectedFqbn}...`
-    ]);
-
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        setSerialLogs((prev) => [
-          ...prev,
-          `[ARDUINO-CLI] 🟢 COMPILATION PASSED!`,
-          ...(res.output ? res.output.split("\n") : [])
-        ]);
-      } else {
-        setSerialLogs((prev) => [
-          ...prev,
-          `[ARDUINO-CLI] 🔴 COMPILATION ERROR:`,
-          ...(res.output ? res.output.split("\n") : [res.error || "Unknown compilation error."])
-        ]);
+        alert("Compilation passed! Check Serial Terminal output below for build statistics.");
       }
     } catch (err) {
-      setSerialLogs((prev) => [...prev, `[ARDUINO-CLI] 🔴 Error: ${err.message}`]);
+      console.error(err);
     }
     setIsCompiling(false);
   };
@@ -141,159 +85,21 @@ void loop() {
   // Upload Sketch via Arduino CLI Backend Endpoint
   const handleUploadArduinoCli = async () => {
     setIsUploading(true);
-    setSerialLogs((prev) => [
-      ...prev,
-      `[ARDUINO-CLI] ⚡ Initiating upload to Port: ${targetPort} (FQBN: ${selectedFqbn})...`
-    ]);
-
     try {
       const res = await uploadHardwareSketch(code, selectedFqbn, targetPort);
       if (res.success) {
-        setSerialLogs((prev) => [
-          ...prev,
-          `[ARDUINO-CLI] 🟢 UPLOAD SUCCESSFUL! Code flashed to ${targetPort}.`,
-          ...(res.output ? res.output.split("\n") : [])
-        ]);
-      } else {
-        setSerialLogs((prev) => [
-          ...prev,
-          `[ARDUINO-CLI] 🔴 UPLOAD FAILED:`,
-          ...(res.output ? res.output.split("\n") : [res.error || "Upload failed."])
-        ]);
+        alert(`Upload completed successfully to ${targetPort}!`);
       }
     } catch (err) {
-      setSerialLogs((prev) => [...prev, `[ARDUINO-CLI] 🔴 Error: ${err.message}`]);
+      console.error(err);
     }
     setIsUploading(false);
   };
 
-  // WebSerial Connect Handler with Hardware Port Verification
-  const handleConnectSerial = async () => {
-    setConnectionError("");
-    setDeviceWarning("");
-
-    if (!("serial" in navigator)) {
-      setConnectionError("WebSerial API is not supported in this browser. Please use Google Chrome or Microsoft Edge.");
-      return;
-    }
-
-    try {
-      // Filter WebSerial USB picker to only show recognized microcontrollers
-      const port = await navigator.serial.requestPort({
-        filters: MICROCONTROLLER_USB_FILTERS
-      });
-
-      const info = port.getInfo();
-      const vid = info.usbVendorId;
-      const pid = info.usbProductId;
-
-      // Verify if device is a valid microcontroller
-      const isValidMicrocontroller = vid && MICROCONTROLLER_USB_FILTERS.some(f => f.usbVendorId === vid);
-
-      if (!isValidMicrocontroller && vid !== undefined) {
-        setDeviceWarning(`Device Rejected: Selected USB device (Vendor ID: 0x${vid.toString(16).toUpperCase()}) is not a recognized microcontroller or single-board computer processor.`);
-        return;
-      }
-
-      await port.open({ baudRate: parseInt(baudRate, 10) });
-
-      const boardName = vid ? identifyMicrocontrollerBoard(vid) : "Connected Microcontroller";
-      const hexVid = vid ? `0x${vid.toString(16).toUpperCase()}` : "N/A";
-      const hexPid = pid ? `0x${pid.toString(16).toUpperCase()}` : "N/A";
-
-      portRef.current = port;
-      setIsConnected(true);
-      setHardwareInfo({ boardName, hexVid, hexPid });
-
-      setSerialLogs((prev) => [
-        ...prev,
-        `[SYSTEM] 🟢 Hardware Verified: ${boardName} (VID: ${hexVid}, PID: ${hexPid}) connected at ${baudRate} Baud.`
-      ]);
-
-      readSerialData(port);
-    } catch (err) {
-      console.error("Serial connection error:", err);
-      if (err.name === "AccessDeniedError" || err.message.includes("locked") || err.message.includes("open")) {
-        setConnectionError("COM Port Access Denied: The serial port is currently in use by another application (e.g. Arduino IDE Serial Monitor). Please close any other terminal and retry.");
-      } else if (err.name === "NotFoundError" || err.message.includes("selected")) {
-        setConnectionError("No hardware device selected. Please connect your Arduino UNO Q, STM32, or ESP32 board.");
-      } else {
-        setConnectionError(`Serial Connection Error: ${err.message}`);
-      }
-    }
-  };
-
-  const readSerialData = async (port) => {
-    const textDecoder = new TextDecoderStream();
-    const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
-    const reader = textDecoder.readable.getReader();
-    readerRef.current = reader;
-
-    let buffer = "";
-
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += value;
-          const lines = buffer.split("\n");
-          buffer = lines.pop(); // keep partial line
-
-          for (const line of lines) {
-            const cleanLine = line.trim();
-            if (cleanLine) {
-              setSerialLogs((prev) => [...prev.slice(-200), `[${new Date().toLocaleTimeString()}] ${cleanLine}`]);
-
-              // Parse TELEMETRY format: TELEMETRY|TEMP:24.5C|HUMIDITY:55%
-              let parsed = {};
-              if (cleanLine.includes("TELEMETRY|")) {
-                const parts = cleanLine.replace("TELEMETRY|", "").split("|");
-                parts.forEach((p) => {
-                  const [k, v] = p.split(":");
-                  if (k && v) parsed[k.trim()] = v.trim();
-                });
-                setTelemetryData((prev) => ({ ...prev, ...parsed }));
-              }
-
-              // Interconnect live hardware serial telemetry output with QC Diagnostics
-              updateLiveTelemetry(parsed, cleanLine);
-            }
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Read error:", err);
-    } finally {
-      reader.releaseLock();
-    }
-  };
-
-  const handleDisconnectSerial = async () => {
-    try {
-      if (readerRef.current) await readerRef.current.cancel();
-      if (portRef.current) await portRef.current.close();
-    } catch (e) {
-      console.error(e);
-    }
-    setIsConnected(false);
-    setHardwareInfo(null);
-    setTelemetryData({});
-    setSerialLogs((prev) => [...prev, `[SYSTEM] Serial port disconnected.`]);
-  };
-
-  const sendSerialCommand = async () => {
-    if (!inputCommand.trim() || !portRef.current) return;
-    try {
-      const encoder = new TextEncoder();
-      const writer = portRef.current.writable.getWriter();
-      await writer.write(encoder.encode(inputCommand + "\n"));
-      writer.releaseLock();
-      setSerialLogs((prev) => [...prev, `[SENT] ${inputCommand}`]);
-      setInputCommand("");
-    } catch (err) {
-      alert("Failed to send command: " + err.message);
-    }
+  const handleSendCommand = () => {
+    if (!inputCommand.trim()) return;
+    sendSerialCommand(inputCommand);
+    setInputCommand("");
   };
 
   return (
@@ -302,9 +108,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Hardware Studio & Arduino CLI Toolchain
+            <Activity /> RUN Hardware Studio & Persistent Microcontroller Engine
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Arduino CLI C++ Compile & Flash engine + WebSerial live telemetry monitor</p>
+          <p className="text-xs text-gray-400 mt-0.5">Global WebSerial connection — Board remains connected across all pages</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -328,17 +134,17 @@ void loop() {
 
           {isConnected ? (
             <button
-              onClick={handleDisconnectSerial}
+              onClick={disconnectHardwarePort}
               className="bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition"
             >
               Disconnect Hardware Port
             </button>
           ) : (
             <button
-              onClick={handleConnectSerial}
+              onClick={() => connectHardwarePort(baudRate)}
               className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg shadow-blue-600/20"
             >
-              <Zap size={16} /> Connect WebSerial Monitor
+              <Zap size={16} /> Connect Microcontroller USB
             </button>
           )}
         </div>
@@ -394,23 +200,23 @@ void loop() {
       </div>
 
       {/* Hardware Connection Status Bar */}
-      {hardwareInfo ? (
+      {isConnected ? (
         <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
             <div>
-              <span className="font-extrabold text-white">{hardwareInfo.boardName}</span> — Connected & Verified (VID: <code className="text-emerald-400">{hardwareInfo.hexVid}</code>, PID: <code className="text-emerald-400">{hardwareInfo.hexPid}</code>)
+              <span className="font-extrabold text-white">{hardwareInfo?.boardName}</span> — Connected & Persistent (VID: <code className="text-emerald-400">{hardwareInfo?.hexVid}</code>, PID: <code className="text-emerald-400">{hardwareInfo?.hexPid}</code>)
             </div>
           </div>
           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-            Physical USB Hardware Port Active
+            🟢 Platform Global Connection Active
           </span>
         </div>
       ) : (
         <div className="p-4 rounded-2xl bg-slate-900 border border-slate-800 text-xs text-gray-400 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Usb size={20} className="text-blue-500 shrink-0 animate-pulse" />
-            <span>🔌 <strong>No WebSerial Stream Active</strong> — Plug in your Arduino UNO Q, STM32, ESP32, or processor board and click <strong>"Connect WebSerial Monitor"</strong> or compile using <strong>Arduino CLI</strong>.</span>
+            <span>🔌 <strong>No Hardware Board Connected</strong> — Plug in your Arduino UNO Q, STM32, ESP32, or processor board and click <strong>"Connect Microcontroller USB"</strong>.</span>
           </div>
         </div>
       )}
@@ -510,7 +316,7 @@ void loop() {
                 <Terminal size={14} /> Serial Terminal & Arduino CLI Build Logs
               </span>
               <button
-                onClick={() => setSerialLogs([])}
+                onClick={clearSerialLogs}
                 className="text-[10px] text-gray-400 hover:text-white font-bold"
               >
                 Clear Terminal
@@ -532,14 +338,14 @@ void loop() {
                 value={inputCommand}
                 onChange={(e) => setInputCommand(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") sendSerialCommand();
+                  if (e.key === "Enter") handleSendCommand();
                 }}
                 disabled={!isConnected}
                 placeholder={isConnected ? "Type command & press Enter..." : "Connect hardware port to send commands..."}
                 className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs font-mono text-white outline-none focus:border-blue-500"
               />
               <button
-                onClick={sendSerialCommand}
+                onClick={handleSendCommand}
                 disabled={!isConnected || !inputCommand.trim()}
                 className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-bold px-4 py-2 rounded-xl"
               >

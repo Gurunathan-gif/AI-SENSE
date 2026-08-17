@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
+import { HardwareProvider } from "./context/HardwareContext";
 
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -19,24 +20,26 @@ import Projects from "./pages/Projects";
 function App() {
   return (
     <BrowserRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/chat" element={<AIChat />} />
-          <Route path="/modules" element={<Modules />} />
-          <Route path="/sensors" element={<SensorLab />} />
-          <Route path="/qc" element={<QualityCheck />} />
-          <Route path="/run" element={<Run />} />
-          <Route path="/documentation" element={<Documentation />} />
-          <Route path="/projects" element={<Projects />} />
-          <Route path="/settings" element={<SettingsPage />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </Layout>
+      <HardwareProvider>
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/chat" element={<AIChat />} />
+            <Route path="/modules" element={<Modules />} />
+            <Route path="/sensors" element={<SensorLab />} />
+            <Route path="/qc" element={<QualityCheck />} />
+            <Route path="/run" element={<Run />} />
+            <Route path="/documentation" element={<Documentation />} />
+            <Route path="/projects" element={<Projects />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Layout>
+      </HardwareProvider>
     </BrowserRouter>
   );
 }

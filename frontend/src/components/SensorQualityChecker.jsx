@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ShieldCheck, AlertTriangle, CheckCircle2, RefreshCw, Activity, Cpu, Wrench, Usb, Info, ExternalLink, XCircle, Zap } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getLatestTelemetry, subscribeTelemetry } from '../services/telemetryService';
+import { useHardware } from '../context/HardwareContext';
 
 const SENSOR_QC_PROFILES = [
   {
@@ -97,9 +97,10 @@ const SENSOR_QC_PROFILES = [
 export default function SensorQualityChecker() {
   const [selectedProfile, setSelectedProfile] = useState(SENSOR_QC_PROFILES[0]);
   const [mode, setMode] = useState('LIVE');
-  const [liveStreamData, setLiveStreamData] = useState(getLatestTelemetry() || { rawLogs: [], parsedData: {}, timestamp: null });
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+
+  const { isConnected, hardwareInfo, telemetryData, connectHardwarePort } = useHardware();
 
   const evaluateTelemetryData = (data) => {
     if (mode === 'SIMULATE_PASS') {
@@ -126,7 +127,7 @@ export default function SensorQualityChecker() {
       return;
     }
 
-    if (!data || Object.keys(data).length === 0) {
+    if (!isConnected || !data || Object.keys(data).length === 0) {
       setTestResult({
         timestamp: new Date().toLocaleTimeString(),
         status: 'NO_HARDWARE',
@@ -164,21 +165,14 @@ export default function SensorQualityChecker() {
 
   // Run evaluation immediately on mount & when state changes
   useEffect(() => {
-    evaluateTelemetryData(liveStreamData?.parsedData);
-    const unsubscribe = subscribeTelemetry((data) => {
-      const safeData = data || { rawLogs: [], parsedData: {}, timestamp: null };
-      setLiveStreamData(safeData);
-      evaluateTelemetryData(safeData.parsedData);
-    });
-    return () => unsubscribe();
-  }, [mode, selectedProfile]);
+    evaluateTelemetryData(telemetryData);
+  }, [mode, selectedProfile, telemetryData, isConnected]);
 
   const handleRunQCTest = () => {
     setTesting(true);
 
     setTimeout(() => {
-      const dataToUse = (mode === 'LIVE' && liveStreamData?.parsedData) ? liveStreamData.parsedData : {};
-      evaluateTelemetryData(dataToUse);
+      evaluateTelemetryData(telemetryData);
       setTesting(false);
     }, 600);
   };
@@ -200,9 +194,7 @@ export default function SensorQualityChecker() {
         <div className="flex flex-wrap items-center gap-3">
           <select
             value={mode}
-            onChange={(e) => {
-              setMode(e.target.value);
-            }}
+            onChange={(e) => setMode(e.target.value)}
             className="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2.5 text-xs font-bold text-blue-400 focus:outline-none"
           >
             <option value="LIVE">🔌 Mode: Physical Microcontroller Data</option>
@@ -224,19 +216,19 @@ export default function SensorQualityChecker() {
       {/* Live Hardware Status Banner */}
       <div className="bg-slate-900 border border-slate-800 p-4 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
         <div className="flex items-center gap-3">
-          <span className={`w-2.5 h-2.5 rounded-full ${liveStreamData?.timestamp ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}`} />
+          <span className={`w-2.5 h-2.5 rounded-full ${isConnected ? 'bg-emerald-500 animate-ping' : 'bg-slate-600'}`} />
           <span className="font-bold text-white">
-            {liveStreamData?.timestamp ? '🟢 Live Hardware Telemetry Streaming' : '🔌 DISCONNECTED — Waiting for Physical Microcontroller USB Port'}
+            {isConnected ? `🟢 Connected to ${hardwareInfo?.boardName || 'Microcontroller'} (VID: ${hardwareInfo?.hexVid})` : '🔌 DISCONNECTED — Waiting for Physical Microcontroller USB Port'}
           </span>
         </div>
 
-        {!liveStreamData?.timestamp && (
-          <Link
-            to="/run"
+        {!isConnected && (
+          <button
+            onClick={() => connectHardwarePort("115200")}
             className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-2 transition"
           >
-            <Usb size={14} /> Connect Microcontroller USB in RUN Studio
-          </Link>
+            <Usb size={14} /> Connect Microcontroller USB
+          </button>
         )}
       </div>
 
@@ -245,9 +237,7 @@ export default function SensorQualityChecker() {
         {SENSOR_QC_PROFILES.map((prof) => (
           <button
             key={prof.id}
-            onClick={() => {
-              setSelectedProfile(prof);
-            }}
+            onClick={() => setSelectedProfile(prof)}
             className={`p-4 rounded-2xl border text-left transition ${
               selectedProfile.id === prof.id
                 ? 'bg-blue-600/10 border-blue-500 text-blue-400'
@@ -307,17 +297,17 @@ export default function SensorQualityChecker() {
                 <div>
                   <span className="text-sm font-bold text-white">🔌 Waiting for Physical Microcontroller USB Connection</span>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    No physical hardware serial telemetry detected. Connect your Arduino UNO Q, STM32, or ESP32 board in RUN Studio to start live inspection.
+                    No physical hardware serial telemetry detected. Connect your Arduino UNO Q, STM32, or ESP32 board to start live inspection.
                   </p>
                 </div>
               </div>
               <div className="flex gap-3">
-                <Link
-                  to="/run"
+                <button
+                  onClick={() => connectHardwarePort("115200")}
                   className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition"
                 >
                   <Usb size={14} /> Connect Microcontroller USB
-                </Link>
+                </button>
                 <button
                   onClick={() => setMode('SIMULATE_PASS')}
                   className="px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 hover:border-blue-500 text-blue-400 font-bold text-xs transition"

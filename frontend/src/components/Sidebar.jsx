@@ -16,15 +16,19 @@ import {
   ChevronRight,
   Server,
   Zap,
-  Radio
+  Radio,
+  Usb
 } from "lucide-react";
 import api from "../api/api";
+import { useHardware } from "../context/HardwareContext";
 
 export default function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [backendStatus, setBackendStatus] = useState("checking");
+
+  const { isConnected, hardwareInfo } = useHardware();
 
   useEffect(() => {
     let isMounted = true;
@@ -41,7 +45,7 @@ export default function Sidebar() {
   const navItems = [
     { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard", badge: null },
     { label: "AI Code Studio", icon: Sparkles, path: "/chat", badge: "Gemini" },
-    { label: "RUN Studio & Hardware", icon: Activity, path: "/run", badge: "Live" },
+    { label: "RUN Studio & Hardware", icon: Activity, path: "/run", badge: isConnected ? "🟢 Active" : "Live" },
     { label: "QC Diagnostics", icon: ShieldCheck, path: "/qc", badge: "QC" },
     { label: "100 Sensor Library", icon: Layers, path: "/sensors", badge: "100" },
     { label: "Cloud Projects", icon: FolderGit2, path: "/projects", badge: null },
@@ -88,6 +92,17 @@ export default function Sidebar() {
         </button>
       </div>
 
+      {/* Persistent Global Microcontroller Connection Badge */}
+      {isConnected && !collapsed && (
+        <div className="mx-4 mt-4 p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-xs text-emerald-300 flex items-center gap-2">
+          <Usb size={16} className="text-emerald-400 animate-pulse shrink-0" />
+          <div className="truncate">
+            <div className="font-extrabold text-white truncate text-[11px]">{hardwareInfo?.boardName || "Microcontroller"}</div>
+            <div className="text-[9px] text-emerald-400 font-mono">VID: {hardwareInfo?.hexVid} — Active</div>
+          </div>
+        </div>
+      )}
+
       {/* Main Navigation Links */}
       <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
         <div className="space-y-1">
@@ -124,7 +139,9 @@ export default function Sidebar() {
                 {!collapsed && item.badge && (
                   <span
                     className={`px-2 py-0.5 text-[9px] font-extrabold rounded-full border ${
-                      isActive
+                      item.badge.includes("Active")
+                        ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40 animate-pulse"
+                        : isActive
                         ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
                         : "bg-slate-900 text-gray-400 border-slate-800"
                     }`}
