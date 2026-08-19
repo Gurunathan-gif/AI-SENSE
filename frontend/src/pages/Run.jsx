@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code, RotateCcw } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
 import { useHardware } from "../context/HardwareContext";
@@ -68,16 +68,24 @@ void loop() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
-  // Compile Sketch via Arduino CLI Backend Endpoint
+  // Compile Sketch via In-Browser Syntax Inspector & Arduino CLI Backend Endpoint
   const handleCompileArduinoCli = async () => {
     setIsCompiling(true);
+    setConnectionError("");
+
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        alert("Compilation passed! Check Serial Terminal output below for build statistics.");
+        setConnectionError("");
+        alert("🟢 C++ Compilation Passed! Check build stats in terminal below.");
+      } else {
+        const errorText = res.error || "Compilation error detected.";
+        setConnectionError(`C++ Compiler Error: ${errorText}`);
+        alert(`🔴 Compilation Failed!\n${errorText}`);
       }
     } catch (err) {
       console.error(err);
+      setConnectionError(`Compilation Error: ${err.message}`);
     }
     setIsCompiling(false);
   };
@@ -85,13 +93,20 @@ void loop() {
   // Upload Sketch via Arduino CLI Backend Endpoint
   const handleUploadArduinoCli = async () => {
     setIsUploading(true);
+    setConnectionError("");
+
     try {
       const res = await uploadHardwareSketch(code, selectedFqbn, targetPort);
       if (res.success) {
-        alert(`Upload completed successfully to ${targetPort}!`);
+        alert(`⚡ Upload Completed Successfully! Binary flashed to ${targetPort}.`);
+      } else {
+        const errorText = res.error || "Upload failed.";
+        setConnectionError(`Flash Upload Failed: ${errorText}`);
+        alert(`🔴 Hardware Upload Failed!\n${errorText}`);
       }
     } catch (err) {
       console.error(err);
+      setConnectionError(`Upload Error: ${err.message}`);
     }
     setIsUploading(false);
   };
@@ -108,9 +123,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Hardware Studio & Persistent Microcontroller Engine
+            <Activity /> RUN Hardware Studio & Real C++ Toolchain
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Global WebSerial connection — Board remains connected across all pages</p>
+          <p className="text-xs text-gray-400 mt-0.5">Real C++ syntax validator + WebSerial live telemetry monitor</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -185,7 +200,7 @@ void loop() {
             className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
           >
             {isCompiling ? <RefreshCw className="animate-spin" size={14} /> : <Code size={14} />}
-            {isCompiling ? "Compiling..." : "⚙️ Compile Sketch (Arduino CLI)"}
+            {isCompiling ? "Checking Syntax..." : "⚙️ Compile Sketch (Syntax Inspector)"}
           </button>
 
           <button
@@ -221,7 +236,7 @@ void loop() {
         </div>
       )}
 
-      {/* Connection Warning Banners */}
+      {/* Connection / Compiler Warning Banners */}
       {deviceWarning && (
         <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -238,14 +253,14 @@ void loop() {
       )}
 
       {connectionError && (
-        <div className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/40 text-amber-300 text-xs flex items-center justify-between gap-4">
+        <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <AlertTriangle size={20} className="text-amber-400 shrink-0" />
-            <span>{connectionError}</span>
+            <AlertTriangle size={20} className="text-red-400 shrink-0" />
+            <span className="font-mono">{connectionError}</span>
           </div>
           <button
             onClick={() => setConnectionError("")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] rounded-lg shrink-0"
+            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] rounded-lg shrink-0"
           >
             Dismiss
           </button>
@@ -313,7 +328,7 @@ void loop() {
           <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden">
             <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex justify-between items-center">
               <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
-                <Terminal size={14} /> Serial Terminal & Arduino CLI Build Logs
+                <Terminal size={14} /> Serial Terminal Output
               </span>
               <button
                 onClick={clearSerialLogs}
@@ -325,9 +340,13 @@ void loop() {
 
             <div className="flex-1 bg-slate-950 p-4 font-mono text-xs text-green-400 overflow-y-auto max-h-[250px] space-y-1">
               {serialLogs.length === 0 ? (
-                <div className="text-gray-600 italic">Waiting for physical microcontroller serial output or Arduino CLI build logs...</div>
+                <div className="text-gray-600 italic">Waiting for physical microcontroller serial output...</div>
               ) : (
-                serialLogs.map((log, idx) => <div key={idx}>{log}</div>)
+                serialLogs.map((log, idx) => (
+                  <div key={idx} className={log.includes("ERROR") || log.includes("Error") ? "text-red-400 font-bold" : ""}>
+                    {log}
+                  </div>
+                ))
               )}
               <div ref={logsEndRef} />
             </div>

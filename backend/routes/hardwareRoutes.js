@@ -41,12 +41,11 @@ router.post("/compile", async (req, res) => {
 
     const cliStatus = await checkArduinoCliAvailable();
     if (!cliStatus.available) {
-      // Graceful fallback response when arduino-cli is not installed on server
       return res.json({
         success: true,
         fallback: true,
-        output: `[SIMULATED COMPILATION]\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nSyntax Verification: PASSED\nMemory Usage: 3,420 bytes (10%) of program storage space.\nGlobal variables use 240 bytes (11%) of dynamic memory.\nNotice: Install 'arduino-cli' on server for real hardware ELF/HEX compilation.`,
-        message: "Arduino CLI is not installed on backend host. Simulated compilation passed."
+        output: `[IN-BROWSER C++ SYNTAX VERIFIED]\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nNotice: 'arduino-cli' is not installed on server host. Connect board via WebSerial or install 'arduino-cli' for binary compilation.`,
+        message: "Arduino CLI is not installed on backend host."
       });
     }
 
@@ -68,10 +67,10 @@ router.post("/upload", async (req, res) => {
     const cliStatus = await checkArduinoCliAvailable();
     if (!cliStatus.available) {
       return res.json({
-        success: true,
+        success: false,
         fallback: true,
-        output: `[SIMULATED UPLOAD]\nTarget Port: ${port}\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nWriting | ################################################## | 100% 0.45s\nReading | ################################################## | 100% 0.32s\nFlash Complete! Code is running on board.`,
-        message: "Arduino CLI is not installed on backend host. Simulated upload passed."
+        output: `[HARDWARE UPLOAD ERROR]\nTarget Port: ${port}\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nError: 'arduino-cli' toolchain is not installed on server host to flash physical COM ports.`,
+        error: "Arduino CLI is not installed on server host."
       });
     }
 
