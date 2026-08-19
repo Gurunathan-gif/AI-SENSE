@@ -1,28 +1,50 @@
 // Arduino Create Agent WebSocket & WebUSB Qualcomm EDL Flasher for Arduino UNO Q
 
-// Method A: Official Arduino Create Agent WebSocket Bridge (Port 8991)
+// Method A: Official Arduino Create Agent WebSocket Bridge with multi-port/protocol auto-detection
 export async function uploadViaCreateAgent({ binBase64, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx", port = "COM3", onProgress = () => {} }) {
-  return new Promise((resolve, reject) => {
-    onProgress("Connecting to local Arduino Create Agent on ws://127.0.0.1:8991/ws...");
+  const agentUrls = [
+    "wss://127.0.0.1:8991/ws",
+    "ws://127.0.0.1:8991/ws",
+    "wss://localhost:8991/ws",
+    "ws://localhost:8991/ws"
+  ];
 
-    let ws;
+  for (const url of agentUrls) {
     try {
-      ws = new WebSocket("ws://127.0.0.1:8991/ws");
+      onProgress(`Attempting Create Agent connection (${url})...`);
+      const result = await tryAgentConnection(url, binBase64, fqbn, port, onProgress);
+      if (result && result.success) return result;
+    } catch (e) {
+      console.warn(`Create Agent connection attempt (${url}) notice:`, e.message);
+    }
+  }
+
+  return {
+    success: false,
+    agentOffline: true,
+    error: "Arduino Create Agent is not active on local machine. Automatic fallback to WebSerial/WebUSB will execute."
+  };
+}
+
+function tryAgentConnection(url, binBase64, fqbn, port, onProgress) {
+  return new Promise((resolve, reject) => {
+    let ws;
+    let timeout = setTimeout(() => {
+      if (ws) try { ws.close(); } catch (e) {}
+      reject(new Error(`Timeout connecting to ${url}`));
+    }, 2500);
+
+    try {
+      ws = new WebSocket(url);
     } catch (err) {
-      reject(new Error("Unable to connect to Arduino Create Agent. Ensure the agent application is running on your machine."));
+      clearTimeout(timeout);
+      reject(err);
       return;
     }
 
-    const timeout = setTimeout(() => {
-      if (ws.readyState !== WebSocket.OPEN) {
-        ws.close();
-        reject(new Error("Arduino Create Agent connection timed out. Please verify Agent is running on localhost:8991."));
-      }
-    }, 5000);
-
     ws.onopen = () => {
       clearTimeout(timeout);
-      onProgress("Connected to Arduino Create Agent! Sending UNO Q upload payload...");
+      onProgress("Connected to Arduino Create Agent! Transmitting upload payload...");
 
       const uploadCommand = {
         command: "upload",
@@ -39,13 +61,13 @@ export async function uploadViaCreateAgent({ binBase64, fqbn = "arduino:zephyr:a
       try {
         const response = JSON.parse(event.data);
         if (response.step === "progress" || response.percentage !== undefined) {
-          onProgress(`Uploading to UNO Q via Agent: ${response.percentage || 0}%`);
+          onProgress(`Uploading via Agent: ${response.percentage || 0}%`);
         } else if (response.success || response.status === "completed") {
           onProgress("Upload completed successfully via Arduino Create Agent!");
-          ws.close();
+          try { ws.close(); } catch (e) {}
           resolve({ success: true, message: "Upload Completed Successfully via Arduino Create Agent!" });
         } else if (response.error) {
-          ws.close();
+          try { ws.close(); } catch (e) {}
           reject(new Error("Create Agent Error: " + response.error));
         }
       } catch (e) {
@@ -55,7 +77,7 @@ export async function uploadViaCreateAgent({ binBase64, fqbn = "arduino:zephyr:a
 
     ws.onerror = (error) => {
       clearTimeout(timeout);
-      reject(new Error("Arduino Create Agent WebSocket error. Make sure the Create Agent background service is active."));
+      reject(new Error(`WebSocket connection failed on ${url}`));
     };
   });
 }
