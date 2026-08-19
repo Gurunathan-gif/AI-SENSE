@@ -6,7 +6,7 @@ import { flashHexOverWebSerial } from "../services/webSerialFlasher";
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
-  { label: "Arduino UNO Q (32-Bit ARM + QRB2210)", fqbn: "arduino:samd:nano_33_iot" },
+  { label: "Arduino UNO Q (Qualcomm QRB2210 + STM32U585)", fqbn: "arduino:zephyr:arduino_uno_q_stm32u585xx" },
   { label: "Arduino UNO R3", fqbn: "arduino:avr:uno" },
   { label: "Arduino Nano", fqbn: "arduino:avr:nano" },
   { label: "Arduino Mega 2560", fqbn: "arduino:avr:mega" },
@@ -50,7 +50,7 @@ void loop() {
   } = useHardware();
 
   const [inputCommand, setInputCommand] = useState("");
-  const [selectedFqbn, setSelectedFqbn] = useState("arduino:avr:uno");
+  const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q_stm32u585xx");
   const [targetPort, setTargetPort] = useState("COM3");
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -79,7 +79,7 @@ void loop() {
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        alert("🟢 C++ Compilation Passed! Intel HEX binary generated successfully.");
+        alert("🟢 C++ Compilation Passed! Binary file (.bin / .hex) generated successfully.");
       } else {
         const errorText = res.error || "Compilation error detected.";
         setConnectionError(`C++ Compiler Error: ${errorText}`);
@@ -99,7 +99,7 @@ void loop() {
     setFlashProgress("Sending sketch to backend compiler...");
 
     try {
-      // 1. Compile C++ on Backend & Fetch .hex Binary
+      // 1. Compile C++ on Backend & Fetch .bin / .hex Binary
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (!res.success) {
         setConnectionError(`Compilation Failed: ${res.error}`);
@@ -108,9 +108,9 @@ void loop() {
         return;
       }
 
-      // 2. If .hex binary returned & WebSerial connected, flash directly via WebSerial
+      // 2. If binary returned & WebSerial connected, flash directly via WebSerial
       if (res.hex && portRef.current) {
-        setFlashProgress("Intel HEX binary compiled! Flashing to board via WebSerial STK500...");
+        setFlashProgress("Compiled binary (.bin / .hex) received! Flashing to Arduino UNO Q / board via WebSerial...");
         const flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => {
           setFlashProgress(msg);
         });
@@ -151,9 +151,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Studio — Arduino CLI + WebSerial Direct Flasher
+            <Activity /> RUN Studio — Arduino UNO Q & Dual-Architecture SBC Flasher
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Backend compiles .ino to .hex &rarr; Browser flashes directly to USB port via WebSerial</p>
+          <p className="text-xs text-gray-400 mt-0.5">Backend compiles `.ino` to `.bin/.hex` &rarr; Browser flashes directly over WebSerial</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -228,7 +228,7 @@ void loop() {
             className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
           >
             {isCompiling ? <RefreshCw className="animate-spin" size={14} /> : <Code size={14} />}
-            {isCompiling ? "Compiling..." : "⚙️ Compile (.INO -> .HEX)"}
+            {isCompiling ? "Compiling..." : "⚙️ Compile (.INO -> .BIN/.HEX)"}
           </button>
 
           <button
