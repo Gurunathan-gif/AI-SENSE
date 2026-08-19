@@ -1,17 +1,10 @@
 services:
   - type: web
     name: ai-sense-backend
-    env: node
-    region: oregon
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: node server.js
+    env: docker
+    dockerfilePath: Dockerfile
+    dockerContext: .
+    plan: free
     envVars:
-      - key: NODE_ENV
-        value: production
-      - key: MONGO_URI
-        sync: false
-      - key: GEMINI_API_KEY
-        sync: false
-      - key: JWT_SECRET
-        sync: false
+      - key: PORT
+        value: 10000
