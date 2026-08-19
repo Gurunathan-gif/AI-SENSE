@@ -47,11 +47,11 @@ export function listConnectedBoards() {
   });
 }
 
-// Safely compile sketch in a temporary directory and return compiled .hex / .bin binary
+// Safely compile sketch in a unique temporary directory and return compiled .hex / .bin binary
 export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
   return new Promise((resolve) => {
     const cleanFqbn = sanitizeInput(fqbn) || "arduino:avr:uno";
-    const uniqueId = crypto.randomBytes(8).toString("hex");
+    const uniqueId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
     const tempDir = path.join(os.tmpdir(), `aisense_sketch_${uniqueId}`);
     const sketchName = `aisense_sketch_${uniqueId}`;
 
@@ -62,6 +62,17 @@ export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
 
       // Secure execFile compilation with output directory to extract .hex / .bin binary
       execFile("arduino-cli", ["compile", "--fqbn", cleanFqbn, "--output-dir", tempDir, tempDir], (err, stdout, stderr) => {
+        if (err) {
+          // If compilation fails, immediately purge directory so NO stale binary can be read
+          try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+          return resolve({
+            success: false,
+            fqbn: cleanFqbn,
+            output: stderr || stdout || err.message,
+            error: stderr || stdout || "Compilation Failed"
+          });
+        }
+
         let hexContent = "";
         let hexFileName = "";
 
@@ -76,25 +87,25 @@ export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
           console.warn("Binary read error:", e.message);
         }
 
-        // Cleanup temp folder
+        // Cleanup temp folder after reading fresh binary
         try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
 
-        if (err) {
-          resolve({
+        if (!hexContent) {
+          return resolve({
             success: false,
             fqbn: cleanFqbn,
-            output: stderr || stdout || err.message,
-            error: "Compilation Failed"
-          });
-        } else {
-          resolve({
-            success: true,
-            fqbn: cleanFqbn,
-            hex: hexContent,
-            hexFileName,
-            output: stdout || "Sketch compiled successfully into Intel HEX binary!",
+            output: "Compilation completed, but no .hex binary was generated.",
+            error: "No .hex binary output found"
           });
         }
+
+        return resolve({
+          success: true,
+          fqbn: cleanFqbn,
+          hex: hexContent,
+          hexFileName,
+          output: stdout || "Sketch compiled successfully into Intel HEX binary!",
+        });
       });
     } catch (err) {
       resolve({
@@ -110,7 +121,7 @@ export function uploadSketch({ code, fqbn = "arduino:avr:uno", port = "COM3" }) 
   return new Promise((resolve) => {
     const cleanFqbn = sanitizeInput(fqbn) || "arduino:avr:uno";
     const cleanPort = sanitizeInput(port) || "COM3";
-    const uniqueId = crypto.randomBytes(8).toString("hex");
+    const uniqueId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
     const tempDir = path.join(os.tmpdir(), `aisense_sketch_${uniqueId}`);
     const sketchName = `aisense_sketch_${uniqueId}`;
 

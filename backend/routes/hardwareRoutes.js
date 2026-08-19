@@ -41,15 +41,18 @@ router.post("/compile", async (req, res) => {
 
     const cliStatus = await checkArduinoCliAvailable();
     if (!cliStatus.available) {
-      return res.json({
+      return res.status(200).json({
         success: true,
         fallback: true,
-        output: `[IN-BROWSER C++ SYNTAX VERIFIED]\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nNotice: 'arduino-cli' is not installed on server host. Connect board via WebSerial or install 'arduino-cli' for binary compilation.`,
+        output: `[IN-BROWSER C++ SYNTAX VERIFIED]\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nNotice: 'arduino-cli' is not installed on server host. Connect board via WebSerial for direct binary flashing.`,
         message: "Arduino CLI is not installed on backend host."
       });
     }
 
     const result = await compileSketch({ code, fqbn });
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -66,7 +69,7 @@ router.post("/upload", async (req, res) => {
 
     const cliStatus = await checkArduinoCliAvailable();
     if (!cliStatus.available) {
-      return res.json({
+      return res.status(400).json({
         success: false,
         fallback: true,
         output: `[HARDWARE UPLOAD ERROR]\nTarget Port: ${port}\nTarget Board FQBN: ${fqbn || "arduino:avr:uno"}\nError: 'arduino-cli' toolchain is not installed on server host to flash physical COM ports.`,
@@ -75,6 +78,9 @@ router.post("/upload", async (req, res) => {
     }
 
     const result = await uploadSketch({ code, fqbn, port });
+    if (!result.success) {
+      return res.status(400).json(result);
+    }
     res.json(result);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
