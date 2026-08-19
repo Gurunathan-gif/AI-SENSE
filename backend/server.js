@@ -16,15 +16,20 @@ const app = express();
 // Connect MongoDB
 connectDB();
 
-// Middleware
-app.use(cors());
+// Universal Production CORS Middleware with Preflight OPTIONS Handling
+app.use(cors({
+  origin: "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+}));
+
 app.use(express.json());
 
-// Test Route
-app.get("/", (req, res) => {
+// Server Root & API Health Check Routes
+app.get(["/", "/api", "/api/"], (req, res) => {
   res.json({
     success: true,
-    message: "AI SENSE Backend Running..."
+    message: "AI SENSE Backend Running Cleanly on Render..."
   });
 });
 
@@ -50,7 +55,7 @@ app.use((req, res) => {
 });
 
 // Server with EADDRINUSE handling
-const PORT = parseInt(process.env.PORT, 10) || 5000;
+const PORT = parseInt(process.env.PORT, 10) || 10000;
 
 function startServer(portToUse) {
   const server = app.listen(portToUse, () => {
