@@ -4,13 +4,20 @@ const getBaseURL = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
-  // Default development API URL
+  
+  // Check if browser is running in production (Vercel host) vs local development
+  if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    // Production Render Docker Backend URL
+    return "https://ai-sense-backend.onrender.com/api";
+  }
+  
+  // Local development API URL
   return "http://localhost:5000/api";
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 4000, // Quick timeout so fallback kicks in fast
+  timeout: 30000, // 30s timeout for Render compilation
 });
 
 api.interceptors.request.use((config) => {

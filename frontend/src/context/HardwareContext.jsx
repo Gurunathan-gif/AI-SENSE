@@ -83,9 +83,16 @@ export function HardwareProvider({ children }) {
     }
 
     try {
-      const port = await navigator.serial.requestPort({
-        filters: MICROCONTROLLER_USB_FILTERS
-      });
+      let port;
+      try {
+        port = await navigator.serial.requestPort({
+          filters: MICROCONTROLLER_USB_FILTERS
+        });
+      } catch (filterErr) {
+        if (filterErr.name === "NotFoundError") throw filterErr;
+        // Fallback for Bluetooth serial blocklist warnings
+        port = await navigator.serial.requestPort();
+      }
 
       const info = port.getInfo();
       const vid = info.usbVendorId;
@@ -94,8 +101,7 @@ export function HardwareProvider({ children }) {
       const isValidMicrocontroller = vid && MICROCONTROLLER_USB_FILTERS.some((f) => f.usbVendorId === vid);
 
       if (!isValidMicrocontroller && vid !== undefined) {
-        setDeviceWarning(`Device Rejected: Selected USB device (Vendor ID: 0x${vid.toString(16).toUpperCase()}) is not a recognized microcontroller or processor.`);
-        return false;
+        setDeviceWarning(`Device Notice: Selected USB device (Vendor ID: 0x${vid.toString(16).toUpperCase()}) connected.`);
       }
 
       const baudToUse = parseInt(requestedBaud, 10);
@@ -162,7 +168,6 @@ export function HardwareProvider({ children }) {
                 setTelemetryData((prev) => ({ ...prev, ...parsed }));
               }
 
-              // Interconnect live telemetry globally across platform
               updateLiveTelemetry(parsed, cleanLine);
             }
           }
