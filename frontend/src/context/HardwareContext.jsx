@@ -216,6 +216,7 @@ export function HardwareProvider({ children }) {
         connectionError,
         deviceWarning,
         baudRate,
+        portRef,
         setBaudRate,
         connectHardwarePort,
         disconnectHardwarePort,

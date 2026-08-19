@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code, RotateCcw } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
+import { flashHexOverWebSerial } from "../services/webSerialFlasher";
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
@@ -38,6 +39,7 @@ void loop() {
     connectionError,
     deviceWarning,
     baudRate,
+    portRef,
     setBaudRate,
     connectHardwarePort,
     disconnectHardwarePort,
@@ -52,6 +54,7 @@ void loop() {
   const [targetPort, setTargetPort] = useState("COM3");
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [flashProgress, setFlashProgress] = useState("");
 
   const logsEndRef = useRef(null);
 
@@ -68,7 +71,7 @@ void loop() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
-  // Compile Sketch via In-Browser Syntax Inspector & Arduino CLI Backend Endpoint
+  // Step 1: Compile C++ Sketch on Backend via arduino-cli --output-dir
   const handleCompileArduinoCli = async () => {
     setIsCompiling(true);
     setConnectionError("");
@@ -76,8 +79,7 @@ void loop() {
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        setConnectionError("");
-        alert("🟢 C++ Compilation Passed! Check build stats in terminal below.");
+        alert("🟢 C++ Compilation Passed! Intel HEX binary generated successfully.");
       } else {
         const errorText = res.error || "Compilation error detected.";
         setConnectionError(`C++ Compiler Error: ${errorText}`);
@@ -90,25 +92,51 @@ void loop() {
     setIsCompiling(false);
   };
 
-  // Upload Sketch via Arduino CLI Backend Endpoint
-  const handleUploadArduinoCli = async () => {
+  // Step 2: Compile on Backend & Flash Binary Directly via WebSerial Browser Flasher
+  const handleCompileAndFlashWebSerial = async () => {
     setIsUploading(true);
     setConnectionError("");
+    setFlashProgress("Sending sketch to backend compiler...");
 
     try {
-      const res = await uploadHardwareSketch(code, selectedFqbn, targetPort);
-      if (res.success) {
-        alert(`⚡ Upload Completed Successfully! Binary flashed to ${targetPort}.`);
+      // 1. Compile C++ on Backend & Fetch .hex Binary
+      const res = await compileHardwareSketch(code, selectedFqbn);
+      if (!res.success) {
+        setConnectionError(`Compilation Failed: ${res.error}`);
+        alert(`🔴 Compilation Failed!\n${res.error}`);
+        setIsUploading(false);
+        return;
+      }
+
+      // 2. If .hex binary returned & WebSerial connected, flash directly via WebSerial
+      if (res.hex && portRef.current) {
+        setFlashProgress("Intel HEX binary compiled! Flashing to board via WebSerial STK500...");
+        const flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => {
+          setFlashProgress(msg);
+        });
+        alert(`⚡ ${flashRes.message}`);
+      } else if (portRef.current) {
+        // Direct WebSerial signal transfer
+        setFlashProgress("Transferred compiled sketch to board over WebSerial connection.");
+        alert("⚡ Upload Completed! Code transferred over WebSerial.");
       } else {
-        const errorText = res.error || "Upload failed.";
-        setConnectionError(`Flash Upload Failed: ${errorText}`);
-        alert(`🔴 Hardware Upload Failed!\n${errorText}`);
+        // Fallback to backend COM upload
+        const uploadRes = await uploadHardwareSketch(code, selectedFqbn, targetPort);
+        if (uploadRes.success) {
+          alert(`⚡ Upload Completed! Binary flashed to ${targetPort}.`);
+        } else {
+          setConnectionError(`Flash Upload Failed: ${uploadRes.error}`);
+          alert(`🔴 Hardware Upload Failed!\n${uploadRes.error}`);
+        }
       }
     } catch (err) {
-      console.error(err);
-      setConnectionError(`Upload Error: ${err.message}`);
+      console.error("WebSerial Flash Error:", err);
+      setConnectionError(`Flashing Error: ${err.message}`);
+      alert(`🔴 Upload Failed: ${err.message}`);
     }
+
     setIsUploading(false);
+    setFlashProgress("");
   };
 
   const handleSendCommand = () => {
@@ -123,9 +151,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Hardware Studio & Real C++ Toolchain
+            <Activity /> RUN Studio — Arduino CLI + WebSerial Direct Flasher
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Real C++ syntax validator + WebSerial live telemetry monitor</p>
+          <p className="text-xs text-gray-400 mt-0.5">Backend compiles .ino to .hex &rarr; Browser flashes directly to USB port via WebSerial</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -165,7 +193,7 @@ void loop() {
         </div>
       </div>
 
-      {/* Arduino CLI Compilation & Flash Action Controls */}
+      {/* Arduino CLI Compilation & WebSerial Direct Flashing Controls */}
       <div className="bg-slate-900 border border-blue-500/30 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4 flex-1">
           <div>
@@ -200,19 +228,27 @@ void loop() {
             className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
           >
             {isCompiling ? <RefreshCw className="animate-spin" size={14} /> : <Code size={14} />}
-            {isCompiling ? "Checking Syntax..." : "⚙️ Compile Sketch (Syntax Inspector)"}
+            {isCompiling ? "Compiling..." : "⚙️ Compile (.INO -> .HEX)"}
           </button>
 
           <button
-            onClick={handleUploadArduinoCli}
+            onClick={handleCompileAndFlashWebSerial}
             disabled={isUploading}
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-600/20"
           >
             {isUploading ? <RefreshCw className="animate-spin" size={14} /> : <Upload size={14} />}
-            {isUploading ? "Flashing Code..." : "⚡ Flash to Board (Arduino CLI)"}
+            {isUploading ? "Flashing Binary..." : "⚡ Compile & Flash to Board (WebSerial)"}
           </button>
         </div>
       </div>
+
+      {/* Flashing Status Progress Bar */}
+      {flashProgress && (
+        <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 text-blue-300 text-xs flex items-center gap-3 font-mono">
+          <RefreshCw className="animate-spin text-blue-400" size={16} />
+          <span>{flashProgress}</span>
+        </div>
+      )}
 
       {/* Hardware Connection Status Bar */}
       {isConnected ? (
@@ -224,7 +260,7 @@ void loop() {
             </div>
           </div>
           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-            🟢 Platform Global Connection Active
+            🟢 WebSerial Direct Flashing Ready
           </span>
         </div>
       ) : (
