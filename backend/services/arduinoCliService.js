@@ -47,24 +47,32 @@ export function listConnectedBoards() {
   });
 }
 
-// Safely compile sketch in a unique temporary directory and return compiled .hex / .bin binary
+// Safely compile sketch in container's isolated /tmp directory and return binary payload (.bin / .hex)
 export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
   return new Promise((resolve) => {
     const cleanFqbn = sanitizeInput(fqbn) || "arduino:avr:uno";
-    const uniqueId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
-    const tempDir = path.join(os.tmpdir(), `aisense_sketch_${uniqueId}`);
-    const sketchName = `aisense_sketch_${uniqueId}`;
+    const buildId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
+    
+    // Target container's isolated volatile /tmp directory
+    const baseTmp = os.tmpdir() || "/tmp";
+    const sketchDir = path.join(baseTmp, `sketch_${buildId}`);
+    const outputDir = path.join(baseTmp, `output_${buildId}`);
 
     try {
-      fs.mkdirSync(tempDir, { recursive: true });
-      const sketchFile = path.join(tempDir, `${sketchName}.ino`);
+      fs.mkdirSync(sketchDir, { recursive: true });
+      fs.mkdirSync(outputDir, { recursive: true });
+
+      const sketchFile = path.join(sketchDir, `sketch_${buildId}.ino`);
       fs.writeFileSync(sketchFile, code || "// empty sketch");
 
-      // Secure execFile compilation with output directory to extract .hex / .bin binary
-      execFile("arduino-cli", ["compile", "--fqbn", cleanFqbn, "--output-dir", tempDir, tempDir], (err, stdout, stderr) => {
+      // Invoke Arduino CLI to compile to binary output directory
+      const args = ["compile", "--fqbn", cleanFqbn, "--output-dir", outputDir, sketchDir];
+
+      execFile("arduino-cli", args, (err, stdout, stderr) => {
         if (err) {
-          // If compilation fails, immediately purge directory so NO stale binary can be read
-          try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+          // If compilation fails, immediately purge directories
+          try { fs.rmSync(sketchDir, { recursive: true, force: true }); } catch (e) {}
+          try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch (e) {}
           return resolve({
             success: false,
             fqbn: cleanFqbn,
@@ -75,27 +83,32 @@ export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
 
         let hexContent = "";
         let hexFileName = "";
+        let binBase64 = "";
 
         try {
-          const files = fs.readdirSync(tempDir);
-          const hexFile = files.find(f => f.endsWith(".hex") || f.endsWith(".bin"));
-          if (hexFile) {
-            hexFileName = hexFile;
-            hexContent = fs.readFileSync(path.join(tempDir, hexFile), "utf-8");
+          const files = fs.readdirSync(outputDir);
+          const binaryFile = files.find(f => f.endsWith(".bin") || f.endsWith(".hex"));
+          if (binaryFile) {
+            hexFileName = binaryFile;
+            const fullPath = path.join(outputDir, binaryFile);
+            const bufferData = fs.readFileSync(fullPath);
+            hexContent = bufferData.toString("utf-8");
+            binBase64 = bufferData.toString("base64");
           }
         } catch (e) {
-          console.warn("Binary read error:", e.message);
+          console.warn("Binary extraction notice:", e.message);
         }
 
-        // Cleanup temp folder after reading fresh binary
-        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+        // Cleanup temporary folders from container memory
+        try { fs.rmSync(sketchDir, { recursive: true, force: true }); } catch (e) {}
+        try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch (e) {}
 
-        if (!hexContent) {
+        if (!hexContent && !binBase64) {
           return resolve({
             success: false,
             fqbn: cleanFqbn,
-            output: "Compilation completed, but no .hex binary was generated.",
-            error: "No .hex binary output found"
+            output: "Compilation completed, but no .bin or .hex binary output was generated.",
+            error: "No binary file generated"
           });
         }
 
@@ -103,14 +116,15 @@ export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
           success: true,
           fqbn: cleanFqbn,
           hex: hexContent,
+          binBase64,
           hexFileName,
-          output: stdout || "Sketch compiled successfully into Intel HEX binary!",
+          output: stdout || "Sketch compiled successfully into firmware binary!",
         });
       });
     } catch (err) {
       resolve({
         success: false,
-        error: "Failed to initialize compilation directory: " + err.message
+        error: "Failed to initialize container compilation directory: " + err.message
       });
     }
   });
@@ -121,17 +135,17 @@ export function uploadSketch({ code, fqbn = "arduino:avr:uno", port = "COM3" }) 
   return new Promise((resolve) => {
     const cleanFqbn = sanitizeInput(fqbn) || "arduino:avr:uno";
     const cleanPort = sanitizeInput(port) || "COM3";
-    const uniqueId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
-    const tempDir = path.join(os.tmpdir(), `aisense_sketch_${uniqueId}`);
-    const sketchName = `aisense_sketch_${uniqueId}`;
+    const buildId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
+    const baseTmp = os.tmpdir() || "/tmp";
+    const sketchDir = path.join(baseTmp, `sketch_${buildId}`);
 
     try {
-      fs.mkdirSync(tempDir, { recursive: true });
-      const sketchFile = path.join(tempDir, `${sketchName}.ino`);
+      fs.mkdirSync(sketchDir, { recursive: true });
+      const sketchFile = path.join(sketchDir, `sketch_${buildId}.ino`);
       fs.writeFileSync(sketchFile, code || "// empty sketch");
 
-      execFile("arduino-cli", ["upload", "-p", cleanPort, "--fqbn", cleanFqbn, tempDir], (err, stdout, stderr) => {
-        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (e) {}
+      execFile("arduino-cli", ["upload", "-p", cleanPort, "--fqbn", cleanFqbn, sketchDir], (err, stdout, stderr) => {
+        try { fs.rmSync(sketchDir, { recursive: true, force: true }); } catch (e) {}
 
         if (err) {
           resolve({
@@ -153,7 +167,7 @@ export function uploadSketch({ code, fqbn = "arduino:avr:uno", port = "COM3" }) 
     } catch (err) {
       resolve({
         success: false,
-        error: "Failed to initialize upload directory: " + err.message
+        error: "Failed to initialize container upload directory: " + err.message
       });
     }
   });
