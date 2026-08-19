@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code, Info } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code, Info, Radio } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
 import { flashHexOverWebSerial, flashStm32UnoQBinary } from "../services/webSerialFlasher";
+import { uploadViaCreateAgent, flashUnoQWebUSB } from "../services/arduinoAgentFlasher";
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
@@ -52,6 +53,7 @@ void loop() {
   const [inputCommand, setInputCommand] = useState("");
   const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q_stm32u585xx");
   const [targetPort, setTargetPort] = useState("COM3");
+  const [flashMethod, setFlashMethod] = useState("AGENT"); // 'AGENT' | 'WEBSERIAL' | 'WEBUSB'
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [flashProgress, setFlashProgress] = useState("");
@@ -92,8 +94,8 @@ void loop() {
     setIsCompiling(false);
   };
 
-  // Step 2: Compile on Backend & Flash Binary Directly via WebSerial Browser Flasher
-  const handleCompileAndFlashWebSerial = async () => {
+  // Step 2: Master Multi-Method Flashing Handler
+  const handleCompileAndFlash = async () => {
     setIsUploading(true);
     setConnectionError("");
     setFlashProgress("Sending sketch to backend compiler...");
@@ -108,10 +110,29 @@ void loop() {
         return;
       }
 
-      // 2. If binary returned & WebSerial connected, flash directly via WebSerial
-      if (portRef.current && (res.hex || res.binBase64)) {
+      // Method A: Official Arduino Create Agent WebSocket Bridge
+      if (flashMethod === "AGENT") {
+        setFlashProgress("Connecting to Arduino Create Agent on ws://127.0.0.1:8991...");
+        const binBase64 = res.binBase64 || (res.hex ? btoa(res.hex) : "");
+        const flashRes = await uploadViaCreateAgent({
+          binBase64,
+          fqbn: selectedFqbn,
+          port: targetPort,
+          onProgress: (msg) => setFlashProgress(msg)
+        });
+        alert(`⚡ ${flashRes.message}`);
+      }
+      // Method B: WebUSB Qualcomm EDL Mode Flashing
+      else if (flashMethod === "WEBUSB") {
+        setFlashProgress("Requesting WebUSB Qualcomm EDL device pairing...");
+        const encoder = new TextEncoder();
+        const bufferData = res.binBase64 ? Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0)).buffer : encoder.encode(res.hex).buffer;
+        const flashRes = await flashUnoQWebUSB(bufferData, (msg) => setFlashProgress(msg));
+        alert(`⚡ ${flashRes.message}`);
+      }
+      // Method C: WebSerial Direct In-Browser Flasher
+      else if (portRef.current && (res.hex || res.binBase64)) {
         setFlashProgress("Compiled binary received! Flashing to target board via WebSerial...");
-        
         let flashRes;
         if (selectedFqbn.includes("uno_q") || selectedFqbn.includes("stm32")) {
           const encoder = new TextEncoder();
@@ -120,12 +141,9 @@ void loop() {
         } else {
           flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => setFlashProgress(msg));
         }
-
         alert(`⚡ ${flashRes.message}`);
-      } else if (portRef.current) {
-        setFlashProgress("Transferred compiled sketch to board over WebSerial connection.");
-        alert("⚡ Upload Completed! Code transferred over WebSerial.");
       } else {
+        // Fallback to backend COM upload
         const uploadRes = await uploadHardwareSketch(code, selectedFqbn, targetPort);
         if (uploadRes.success) {
           alert(`⚡ Upload Completed! Binary flashed to ${targetPort}.`);
@@ -135,7 +153,7 @@ void loop() {
         }
       }
     } catch (err) {
-      console.error("WebSerial Flash Error:", err);
+      console.error("Flash Error:", err);
       setConnectionError(`Flashing Error: ${err.message}`);
       alert(`🔴 Upload Failed: ${err.message}`);
     }
@@ -158,7 +176,7 @@ void loop() {
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
             <Activity /> RUN Studio — Arduino UNO Q & Dual-Architecture SBC Flasher
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Backend compiles `.ino` to `.bin/.hex` &rarr; Browser flashes directly over WebSerial</p>
+          <p className="text-xs text-gray-400 mt-0.5">Backend compiles `.ino` to `.bin/.hex` &rarr; Frontend flashes via Create Agent WebSocket / WebUSB / WebSerial</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -198,19 +216,26 @@ void loop() {
         </div>
       </div>
 
-      {/* Arduino UNO Q Hardware Flash Guidance Hint */}
-      <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-2xl flex items-center gap-3 text-xs text-blue-300">
-        <Info size={18} className="text-blue-400 shrink-0" />
-        <div>
-          <strong className="text-white">Arduino UNO Q Hardware Hint:</strong> If web upload gets stuck, press &amp; hold the <code className="text-blue-400 font-bold">BOOT</code> button on your board while tapping <code className="text-blue-400 font-bold">RESET</code> to force the STM32 chip into native DFU upload mode.
+      {/* Arduino UNO Q Hardware Verification Guidance Banner */}
+      <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-2xl space-y-2 text-xs text-blue-300">
+        <div className="flex items-center gap-2 font-bold text-white">
+          <Info size={18} className="text-blue-400" /> Arduino UNO Q Hardware Verification Rules:
+        </div>
+        <div className="grid md:grid-cols-2 gap-3 pt-1 text-[11px] text-gray-300">
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+            <strong className="text-blue-400">1. Linux Heartbeat Pulse:</strong> Wait for the internal Debian OS partition to finish booting (LED matrix animation settles into a steady heartbeat) before clicking Upload.
+          </div>
+          <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
+            <strong className="text-blue-400">2. Power Requirement (5V / 3A):</strong> Connect UNO Q using a high-quality USB-C data cable plugged into a 5V / 3A port to prevent connection drops during flashing.
+          </div>
         </div>
       </div>
 
-      {/* Arduino CLI Compilation & WebSerial Direct Flashing Controls */}
+      {/* Arduino CLI Compilation & Multi-Method Flashing Controls */}
       <div className="bg-slate-900 border border-blue-500/30 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4 flex-1">
           <div>
-            <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Target Microcontroller FQBN</label>
+            <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Target Board FQBN</label>
             <select
               value={selectedFqbn}
               onChange={(e) => setSelectedFqbn(e.target.value)}
@@ -223,14 +248,16 @@ void loop() {
           </div>
 
           <div>
-            <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Target Hardware Port</label>
-            <input
-              type="text"
-              value={targetPort}
-              onChange={(e) => setTargetPort(e.target.value)}
-              placeholder="e.g. COM3, COM4, /dev/ttyACM0"
-              className="bg-slate-950 border border-slate-800 text-xs font-mono text-blue-400 rounded-xl px-3 py-2 focus:outline-none focus:border-blue-500 w-44"
-            />
+            <label className="text-[10px] uppercase font-bold text-gray-400 block mb-1">Flash Execution Method</label>
+            <select
+              value={flashMethod}
+              onChange={(e) => setFlashMethod(e.target.value)}
+              className="bg-slate-950 border border-slate-800 text-xs font-bold text-emerald-400 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
+            >
+              <option value="AGENT">⚡ Method A: Arduino Create Agent (ws://127.0.0.1:8991)</option>
+              <option value="WEBSERIAL">🔌 Method B: WebSerial / STK500 Protocol</option>
+              <option value="WEBUSB">🌐 Method C: WebUSB Qualcomm EDL Mode</option>
+            </select>
           </div>
         </div>
 
@@ -241,16 +268,16 @@ void loop() {
             className="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl flex items-center gap-2 transition"
           >
             {isCompiling ? <RefreshCw className="animate-spin" size={14} /> : <Code size={14} />}
-            {isCompiling ? "Compiling..." : "⚙️ Compile (.INO -> .BIN/.HEX)"}
+            {isCompiling ? "Compiling..." : "⚙️ Compile (.INO -> .BIN)"}
           </button>
 
           <button
-            onClick={handleCompileAndFlashWebSerial}
+            onClick={handleCompileAndFlash}
             disabled={isUploading}
             className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2.5 rounded-xl flex items-center gap-2 transition shadow-lg shadow-emerald-600/20"
           >
             {isUploading ? <RefreshCw className="animate-spin" size={14} /> : <Upload size={14} />}
-            {isUploading ? "Flashing Binary..." : "⚡ Compile & Flash to Board (WebSerial)"}
+            {isUploading ? "Flashing Binary..." : "⚡ Compile & Flash to Board"}
           </button>
         </div>
       </div>
@@ -273,7 +300,7 @@ void loop() {
             </div>
           </div>
           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-            🟢 WebSerial Direct Flashing Ready
+            🟢 Platform Connection Active ({flashMethod})
           </span>
         </div>
       ) : (
