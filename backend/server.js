@@ -16,11 +16,25 @@ const app = express();
 // Connect MongoDB
 connectDB();
 
-// 1. Manual Bulletproof CORS Headers Middleware (Must be FIRST)
+const ALLOWED_ORIGINS = [
+  "https://ai-sense.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:5000"
+];
+
+// 1. Bulletproof Manual CORS Interceptor (Executes before any route)
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  if (origin && ALLOWED_ORIGINS.includes(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Access-Control-Allow-Credentials", "true");
+  } else {
+    res.header("Access-Control-Allow-Origin", "*");
+  }
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
+  
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
@@ -29,9 +43,16 @@ app.use((req, res, next) => {
 
 // 2. Express CORS Package Middleware
 app.use(cors({
-  origin: "*",
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true);
+    }
+  },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"]
+  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
+  credentials: true
 }));
 
 app.use(express.json());
