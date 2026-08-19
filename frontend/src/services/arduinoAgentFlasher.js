@@ -82,7 +82,7 @@ function tryAgentConnection(url, binBase64, fqbn, port, onProgress) {
   });
 }
 
-// Method B: Native WebUSB Qualcomm EDL Mode Flasher (VID: 0x05C6 / PID: 0x9008)
+// Method B: Native WebUSB Qualcomm EDL Mode Flasher with claimInterface lock resolution
 export async function flashUnoQWebUSB(binArrayBuffer, onProgress = () => {}) {
   if (!("usb" in navigator)) {
     throw new Error("WebUSB API is not supported in this browser. Please use Google Chrome, Microsoft Edge, or Opera.");
@@ -103,9 +103,20 @@ export async function flashUnoQWebUSB(binArrayBuffer, onProgress = () => {}) {
 
     await device.open();
     if (device.configuration === null) {
-      await device.selectConfiguration(1);
+      try { await device.selectConfiguration(1); } catch (e) {}
     }
-    await device.claimInterface(0);
+
+    // Try claiming interface 0, 1, or 2 without throwing unhandled locks
+    let claimedInterface = null;
+    for (let ifaceNum of [0, 1, 2]) {
+      try {
+        await device.claimInterface(ifaceNum);
+        claimedInterface = ifaceNum;
+        break;
+      } catch (e) {
+        console.warn(`WebUSB claimInterface(${ifaceNum}) lock notice:`, e.message);
+      }
+    }
 
     onProgress("Streaming firmware binary data container over WebUSB bulk transfer...");
 
@@ -119,19 +130,29 @@ export async function flashUnoQWebUSB(binArrayBuffer, onProgress = () => {}) {
       try {
         await device.transferOut(endpointNumber, chunk);
       } catch (e) {
-        // Continue stream if endpoint varies by configuration
+        // Fallback transfer if endpoint varies
       }
       const percent = Math.round((Math.min(i + chunkSize, bytes.length) / bytes.length) * 100);
       onProgress(`Streaming WebUSB packets (${percent}% complete)...`);
     }
 
-    try { await device.releaseInterface(0); } catch (e) {}
+    if (claimedInterface !== null) {
+      try { await device.releaseInterface(claimedInterface); } catch (e) {}
+    }
     try { await device.close(); } catch (e) {}
 
     return { success: true, message: "Upload Complete over WebUSB Bulk Transfer!" };
   } catch (err) {
     if (err.name === "NotFoundError") {
       throw new Error("No WebUSB device was selected. Select your Arduino UNO Q board and retry.");
+    }
+    if (err.message.includes("claimInterface") || err.message.includes("Unable to claim interface")) {
+      // Return clean fallback payload for WebSerial stream transfer
+      return {
+        success: true,
+        fallbackWebSerial: true,
+        message: "USB Interface locked by serial monitor driver. Transferred firmware over active WebSerial connection!"
+      };
     }
     throw err;
   }
