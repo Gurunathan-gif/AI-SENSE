@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code } from "lucide-react";
+import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code, Info } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
-import { flashHexOverWebSerial } from "../services/webSerialFlasher";
+import { flashHexOverWebSerial, flashStm32UnoQBinary } from "../services/webSerialFlasher";
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
@@ -79,7 +79,7 @@ void loop() {
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        alert("🟢 C++ Compilation Passed! Binary file (.bin / .hex) generated successfully.");
+        alert("🟢 C++ Compilation Passed! Firmware binary (.bin / .hex) generated successfully.");
       } else {
         const errorText = res.error || "Compilation error detected.";
         setConnectionError(`C++ Compiler Error: ${errorText}`);
@@ -109,18 +109,23 @@ void loop() {
       }
 
       // 2. If binary returned & WebSerial connected, flash directly via WebSerial
-      if (res.hex && portRef.current) {
-        setFlashProgress("Compiled binary (.bin / .hex) received! Flashing to Arduino UNO Q / board via WebSerial...");
-        const flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => {
-          setFlashProgress(msg);
-        });
+      if (portRef.current && (res.hex || res.binBase64)) {
+        setFlashProgress("Compiled binary received! Flashing to target board via WebSerial...");
+        
+        let flashRes;
+        if (selectedFqbn.includes("uno_q") || selectedFqbn.includes("stm32")) {
+          const encoder = new TextEncoder();
+          const bytes = res.binBase64 ? Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0)) : encoder.encode(res.hex);
+          flashRes = await flashStm32UnoQBinary(portRef.current, bytes, (msg) => setFlashProgress(msg));
+        } else {
+          flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => setFlashProgress(msg));
+        }
+
         alert(`⚡ ${flashRes.message}`);
       } else if (portRef.current) {
-        // Direct WebSerial signal transfer
         setFlashProgress("Transferred compiled sketch to board over WebSerial connection.");
         alert("⚡ Upload Completed! Code transferred over WebSerial.");
       } else {
-        // Fallback to backend COM upload
         const uploadRes = await uploadHardwareSketch(code, selectedFqbn, targetPort);
         if (uploadRes.success) {
           alert(`⚡ Upload Completed! Binary flashed to ${targetPort}.`);
@@ -190,6 +195,14 @@ void loop() {
               <Zap size={16} /> Connect Microcontroller USB
             </button>
           )}
+        </div>
+      </div>
+
+      {/* Arduino UNO Q Hardware Flash Guidance Hint */}
+      <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-2xl flex items-center gap-3 text-xs text-blue-300">
+        <Info size={18} className="text-blue-400 shrink-0" />
+        <div>
+          <strong className="text-white">Arduino UNO Q Hardware Hint:</strong> If web upload gets stuck, press &amp; hold the <code className="text-blue-400 font-bold">BOOT</code> button on your board while tapping <code className="text-blue-400 font-bold">RESET</code> to force the STM32 chip into native DFU upload mode.
         </div>
       </div>
 
