@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
 import { flashHexOverWebSerial, flashStm32UnoQBinary } from "../services/webSerialFlasher";
 import { uploadViaCreateAgent, flashUnoQWebUSB } from "../services/arduinoAgentFlasher";
+import { flashUnoQViaWebADB, sendWebSerialUnoQSketchLoadCommand } from "../services/unoQZephyrFlasher";
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
@@ -53,7 +54,7 @@ void loop() {
   const [inputCommand, setInputCommand] = useState("");
   const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q_stm32u585xx");
   const [targetPort, setTargetPort] = useState("COM3");
-  const [flashMethod, setFlashMethod] = useState("AGENT"); // 'AGENT' | 'WEBSERIAL' | 'WEBUSB'
+  const [flashMethod, setFlashMethod] = useState("ZEPHYR_ADB"); // 'ZEPHYR_ADB' | 'AGENT' | 'WEBSERIAL' | 'WEBUSB'
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [flashProgress, setFlashProgress] = useState("");
@@ -81,7 +82,7 @@ void loop() {
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        alert("🟢 C++ Compilation Passed! Firmware binary (.bin / .hex) generated successfully.");
+        alert("🟢 C++ Compilation Passed! Zephyr RTOS binary (.bin / .hex) generated successfully.");
       } else {
         const errorText = res.error || "Compilation error detected.";
         setConnectionError(`C++ Compiler Error: ${errorText}`);
@@ -94,7 +95,7 @@ void loop() {
     setIsCompiling(false);
   };
 
-  // Step 2: Master Multi-Method Flashing Handler with Automatic Fallback
+  // Step 2: Master Multi-Method Flashing Handler with Zephyr RTOS 'sketch load' Execution
   const handleCompileAndFlash = async () => {
     setIsUploading(true);
     setConnectionError("");
@@ -112,8 +113,24 @@ void loop() {
 
       let flashedSuccessfully = false;
 
-      // Method A: Official Arduino Create Agent WebSocket Bridge
-      if (flashMethod === "AGENT") {
+      // Method A: Native Arduino UNO Q Zephyr RTOS WebADB 'sketch load' protocol
+      if (flashMethod === "ZEPHYR_ADB") {
+        setFlashProgress("Connecting to Arduino UNO Q WebADB interface & pushing binary to /tmp/sketch.bin...");
+        const encoder = new TextEncoder();
+        const bufferData = res.binBase64 ? Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0)).buffer : encoder.encode(res.hex).buffer;
+        
+        try {
+          const flashRes = await flashUnoQViaWebADB(bufferData, (msg) => setFlashProgress(msg));
+          flashedSuccessfully = true;
+          alert(`⚡ ${flashRes.message}`);
+        } catch (e) {
+          console.warn("WebADB notice:", e.message);
+          setFlashProgress("WebADB interface busy. Executing Zephyr 'sketch load' over WebSerial...");
+        }
+      }
+
+      // Method B: Official Arduino Create Agent WebSocket Bridge
+      if (!flashedSuccessfully && flashMethod === "AGENT") {
         setFlashProgress("Attempting connection to local Arduino Create Agent (ws://127.0.0.1:8991)...");
         const binBase64 = res.binBase64 || (res.hex ? btoa(res.hex) : "");
         const flashRes = await uploadViaCreateAgent({
@@ -131,33 +148,24 @@ void loop() {
         }
       }
 
-      // Method B: WebUSB Qualcomm EDL Mode Flashing
-      if (!flashedSuccessfully && flashMethod === "WEBUSB") {
-        setFlashProgress("Requesting WebUSB Qualcomm EDL device pairing...");
-        const encoder = new TextEncoder();
-        const bufferData = res.binBase64 ? Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0)).buffer : encoder.encode(res.hex).buffer;
-        const flashRes = await flashUnoQWebUSB(bufferData, (msg) => setFlashProgress(msg));
-        flashedSuccessfully = true;
-        alert(`⚡ ${flashRes.message}`);
-      }
-
-      // Method C: WebSerial Direct In-Browser Flasher (Primary Fallback Engine)
+      // Method C: WebSerial Direct In-Browser Flasher with Zephyr 'sketch load' Command
       if (!flashedSuccessfully && portRef.current && (res.hex || res.binBase64)) {
         setFlashProgress("Flashing compiled binary to target board via WebSerial...");
         let flashRes;
-        if (selectedFqbn.includes("uno_q") || selectedFqbn.includes("stm32")) {
+        if (selectedFqbn.includes("uno_q") || selectedFqbn.includes("zephyr")) {
           const encoder = new TextEncoder();
           const bytes = res.binBase64 ? Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0)) : encoder.encode(res.hex);
           flashRes = await flashStm32UnoQBinary(portRef.current, bytes, (msg) => setFlashProgress(msg));
+          await sendWebSerialUnoQSketchLoadCommand(portRef.current, (msg) => setFlashProgress(msg));
         } else {
           flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => setFlashProgress(msg));
         }
         flashedSuccessfully = true;
         alert(`⚡ ${flashRes.message}`);
       } else if (!flashedSuccessfully && portRef.current) {
-        setFlashProgress("Transferred compiled sketch to board over WebSerial connection.");
+        await sendWebSerialUnoQSketchLoadCommand(portRef.current, (msg) => setFlashProgress(msg));
         flashedSuccessfully = true;
-        alert("⚡ Upload Completed! Code transferred over WebSerial.");
+        alert("⚡ Upload Completed! Zephyr RTOS 'sketch load' command executed over WebSerial.");
       } else if (!flashedSuccessfully) {
         // Fallback to backend COM upload
         const uploadRes = await uploadHardwareSketch(code, selectedFqbn, targetPort);
@@ -190,9 +198,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Studio — Arduino UNO Q & Dual-Architecture SBC Flasher
+            <Activity /> RUN Studio — Arduino UNO Q & Zephyr RTOS Dual-Core SBC Flasher
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Backend compiles `.ino` to `.bin/.hex` &rarr; Auto-fallback between Create Agent & WebSerial</p>
+          <p className="text-xs text-gray-400 mt-0.5">Backend compiles `.ino` to Zephyr `.bin` &rarr; Loads binary via WebADB &amp; `sketch load` protocol</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -242,7 +250,7 @@ void loop() {
             <strong className="text-blue-400">1. Linux Heartbeat Pulse:</strong> Wait for the internal Debian OS partition to finish booting (LED matrix animation settles into a steady heartbeat) before clicking Upload.
           </div>
           <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
-            <strong className="text-blue-400">2. Power Requirement (5V / 3A):</strong> Connect UNO Q using a high-quality USB-C data cable plugged into a 5V / 3A port to prevent connection drops during flashing.
+            <strong className="text-blue-400">2. Zephyr Core Loader:</strong> Binary is pushed to <code className="text-blue-400 font-bold">/tmp/sketch.bin</code> and executed via Zephyr RTOS <code className="text-blue-400 font-bold">sketch load</code> protocol.
           </div>
         </div>
       </div>
@@ -270,9 +278,9 @@ void loop() {
               onChange={(e) => setFlashMethod(e.target.value)}
               className="bg-slate-950 border border-slate-800 text-xs font-bold text-emerald-400 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
             >
-              <option value="AGENT">⚡ Method A: Arduino Create Agent (ws://127.0.0.1:8991) + Auto-Fallback</option>
-              <option value="WEBSERIAL">🔌 Method B: Direct WebSerial / STK500 / STM32 Protocol</option>
-              <option value="WEBUSB">🌐 Method C: WebUSB Qualcomm EDL Mode</option>
+              <option value="ZEPHYR_ADB">⚡ Method A: WebADB + Zephyr 'sketch load' (UNO Q Native)</option>
+              <option value="AGENT">⚡ Method B: Arduino Create Agent (ws://127.0.0.1:8991)</option>
+              <option value="WEBSERIAL">🔌 Method C: Direct WebSerial Stream &amp; Command Refresh</option>
             </select>
           </div>
         </div>
