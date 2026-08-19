@@ -20,16 +20,21 @@ RUN arduino-cli config init
 
 # 6. Install AVR and Zephyr board platforms for Arduino UNO & UNO Q
 RUN arduino-cli core update-index && \
-    arduino-cli core install arduino:avr || true
+    (arduino-cli core install arduino:avr || true) && \
+    (arduino-cli core install arduino:zephyr || true)
 
-# 7. Establish working application directory
+# 7. Install exact required Router Bridge libraries for UNO Q
+RUN (arduino-cli lib install "Arduino_RouterBridge" || true) && \
+    (arduino-cli lib install "Arduino_Bridge" || true)
+
+# 8. Establish working application directory
 WORKDIR /usr/src/app
 
-# 8. Copy package configurations and install production node packages
+# 9. Copy package configurations and install production node packages
 COPY package*.json ./
 RUN npm ci --only=production
 
-# 9. Copy remaining Node.js backend code
+# 10. Copy remaining Node.js backend code
 COPY . .
 
 # Expose Express port
