@@ -6,7 +6,7 @@ import cors from "cors";
 
 const app = express();
 
-// Absolute Top Brute-Force CORS Middleware - Bypasses all Preflight (OPTIONS) browser checks
+// Global CORS Middleware - Bypasses all Preflight (OPTIONS) browser checks
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -28,11 +28,12 @@ app.use(cors({
 
 app.use(express.json());
 
-// Server online status endpoints
-app.get('/', (req, res) => res.json({ status: "online", system: "active" }));
-app.get('/api', (req, res) => res.json({ status: "online", system: "api-active" }));
-app.get('/api/hardware/compile', (req, res) => res.json({ status: "ready" }));
+// Base endpoints for verification
+app.get('/', (req, res) => res.status(200).json({ status: "online", system: "active" }));
+app.get('/api', (req, res) => res.status(200).json({ status: "api active" }));
+app.get('/api/hardware/compile', (req, res) => res.status(200).json({ status: "ready" }));
 
+// Main Compilation Endpoint
 app.post('/api/hardware/compile', (req, res) => {
   const userCode = req.body.code;
   if (!userCode) {
@@ -47,25 +48,22 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // Official Arduino Zephyr Board FQBN
+    // Arduino CLI configuration for Uno Q
     const fqbn = req.body.fqbn || "arduino:zephyr:arduino_uno_q";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
-    const childProc = exec(cmd, (error, stdout, stderr) => {
+    const subProcess = exec(cmd, (error, stdout, stderr) => {
       const cleanup = () => {
         try {
           fs.rmSync(sketchDir, { recursive: true, force: true });
           fs.rmSync(outputDir, { recursive: true, force: true });
-        } catch (e) {}
+        } catch(e){}
       };
 
       if (error) {
-        console.error("COMPILER CRASH CATCH:", stderr || stdout);
+        console.error("CLI Compiler Error:", stderr || stdout);
         cleanup();
-        return res.status(400).json({ 
-          error: "Compiler rejected this board execution context.",
-          details: stderr || stdout || error.message 
-        });
+        return res.status(400).json({ error: stderr || stdout || error.message });
       }
 
       const binPath = path.join(outputDir, `sketch_${buildId}.bin`);
@@ -77,14 +75,13 @@ app.post('/api/hardware/compile', (req, res) => {
       res.download(binPath, 'firmware.bin', () => cleanup());
     });
 
-    // Process-level event listener prevents child process crash from downing Express
-    childProc.on('error', (err) => {
-      console.error("Process execution crashed fundamentally:", err);
+    // Error safety trap
+    subProcess.on('error', (err) => {
+      console.error("Process thread error:", err);
       if (!res.headersSent) {
-        res.status(500).json({ error: "System execution thread crashed safely.", details: err.message });
+        res.status(500).json({ error: "Process runtime crash prevented", details: err.message });
       }
     });
-
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -96,11 +93,11 @@ app.post(['/api/compile', '/compile'], (req, res, next) => {
   return app._router.handle(req, res, next);
 });
 
-// Global Exception Catching Middleware (Prevents 502 Bad Gateway)
+// Protect Express from unexpected global route exceptions
 app.use((err, req, res, next) => {
-  console.error("Global Catching Error:", err.stack || err.message);
+  console.error("Global Catch:", err.stack || err.message);
   res.header("Access-Control-Allow-Origin", "*");
-  res.status(500).json({ error: "Internal Server Protected From Crash", message: err.message });
+  res.status(500).json({ error: "Internal Server Protected" });
 });
 
 // Process Level Crash Handlers
