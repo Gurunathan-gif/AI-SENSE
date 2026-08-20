@@ -8,7 +8,7 @@ const getBaseURL = () => {
   // Check if browser is running in production (Vercel host) vs local development
   if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
     // Production Render Docker Backend URL
-    return "https://ai-sense-backend.onrender.com/api";
+    return "https://onrender.com";
   }
   
   // Local development API URL
