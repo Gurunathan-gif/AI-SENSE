@@ -16,7 +16,7 @@ const app = express();
 // Connect MongoDB safely
 connectDB();
 
-// 1. ABSOLUTE FIRST MIDDLEWARE: Top-Level CORS Policy (Zero Redirects on OPTIONS)
+// 1. ABSOLUTE TOP OF MIDDLEWARE CHAIN: Universal Cors Configuration
 app.use(cors({
   origin: '*', 
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -24,13 +24,8 @@ app.use(cors({
   credentials: true
 }));
 
-// 2. Explicitly handle preflight OPTIONS check with immediate 200 OK (NO Redirects)
-app.options('*', (req, res) => {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  return res.status(200).end();
-});
+// 2. Explicitly handle all preflight OPTIONS checks immediately
+app.options('*', cors());
 
 // 3. Header Interceptor for all incoming requests
 app.use((req, res, next) => {
@@ -45,10 +40,10 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// 4. Server Root & Health Check Routes (Handles trailing & non-trailing slashes without redirect)
-app.get(["/", "/api", "/api/", "/status", "/api/status", "/api/status/"], (req, res) => {
-  res.json({ status: "compiler online", success: true, message: "AI SENSE Backend Running Cleanly on Render..." });
-});
+// 4. Server Root & Health Check Routes (Explicit 200 OK responses for /api and /api/)
+app.get('/', (req, res) => res.status(200).json({ status: "backend server live", message: "AI SENSE Backend Live" }));
+app.get('/api', (req, res) => res.status(200).json({ status: "api interface live", message: "API server is online" }));
+app.get('/api/', (req, res) => res.status(200).json({ status: "api interface live", message: "API server is online with slash" }));
 
 // API Routes
 app.use("/api/auth", authRoutes);
@@ -57,15 +52,8 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/hardware", hardwareRoutes);
 
-// Direct compile route alias handler matching all path variations (Trailing & Non-Trailing)
-app.post([
-  "/api/hardware/compile", 
-  "/api/hardware/compile/", 
-  "/api/compile", 
-  "/api/compile/", 
-  "/compile", 
-  "/compile/"
-], (req, res, next) => {
+// Direct compile route alias handler (/api/hardware/compile and /api/compile)
+app.post(["/api/hardware/compile", "/api/compile", "/compile"], (req, res, next) => {
   req.url = "/compile";
   return hardwareRoutes(req, res, next);
 });
@@ -77,7 +65,7 @@ app.use((err, req, res, next) => {
   res.status(500).json({ error: "Internal Server Error Triggered Safely", message: err.message });
 });
 
-// 404 Handler with CORS headers preserved (NO Redirects)
+// 404 Handler with CORS headers preserved
 app.use((req, res) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.status(404).json({ error: "Route Not Found" });
