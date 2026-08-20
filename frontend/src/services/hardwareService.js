@@ -1,4 +1,4 @@
-import api from "../api/api.js";
+import api, { getBaseURL } from "../api/api.js";
 
 // Real C++ Syntax & Structure Inspector
 export function inspectCppCodeSyntax(code) {
@@ -78,7 +78,7 @@ export async function fetchConnectedBoards() {
   }
 }
 
-// Compile C++ code via Arduino CLI endpoint with single pure fetch call
+// Compile C++ code via Arduino CLI endpoint with single pure fetch call to Railway Backend
 export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") {
   const syntaxCheck = inspectCppCodeSyntax(code);
   if (!syntaxCheck.valid) {
@@ -90,9 +90,12 @@ export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") 
     };
   }
 
-  // Single Pure Fetch Request (No dual Axios interference)
+  // Dynamic Railway / Cloud API Base Endpoint
+  const targetEndpoint = `${getBaseURL()}/hardware/compile`;
+
+  // Single Pure Fetch Request
   try {
-    const response = await fetch("https://ai-sense-backend.onrender.com/api/hardware/compile", {
+    const response = await fetch(targetEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -117,10 +120,10 @@ export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") 
       success: true,
       firmwareBytes,
       binBase64: btoa(String.fromCharCode.apply(null, firmwareBytes)),
-      output: "⚡ Cloud compilation successful! Received binary payload."
+      output: "⚡ Cloud compilation successful on Railway container! Received binary payload."
     };
   } catch (err) {
-    console.warn("Render backend fetch notice:", err.message);
+    console.warn("Railway backend fetch notice:", err.message);
   }
 
   // Fallback Payload for Direct WebSerial Flashing

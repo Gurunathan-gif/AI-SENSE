@@ -1,13 +1,13 @@
 import axios from "axios";
 
-const getBaseURL = () => {
+export const getBaseURL = () => {
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
   }
   
   if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    // Production Render Docker Backend URL
-    return "https://ai-sense-backend.onrender.com/api";
+    // Production Railway Docker Backend URL
+    return "https://ai-sense-backend-production.up.railway.app/api";
   }
   
   return "http://localhost:5000/api";
@@ -15,7 +15,7 @@ const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 60000, // 60s timeout to gracefully support Render free tier cold-start wakeups (~30-45s)
+  timeout: 45000,
 });
 
 api.interceptors.request.use((config) => {
