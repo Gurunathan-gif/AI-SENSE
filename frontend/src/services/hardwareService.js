@@ -78,8 +78,8 @@ export async function fetchConnectedBoards() {
   }
 }
 
-// Compile C++ code via Arduino CLI endpoint with graceful fallback
-export async function compileHardwareSketch(code, fqbn = "arduino:avr:uno") {
+// Compile C++ code via Arduino CLI endpoint with explicit JSON header and error reader
+export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx") {
   const syntaxCheck = inspectCppCodeSyntax(code);
   if (!syntaxCheck.valid) {
     return {
@@ -90,18 +90,54 @@ export async function compileHardwareSketch(code, fqbn = "arduino:avr:uno") {
     };
   }
 
-  // Attempt 1: Axios API Request to configured base API
+  // Attempt 1: Direct Fetch with Explicit Content-Type Header and Error Reader
+  try {
+    const response = await fetch("https://ai-sense-backend.onrender.com/api/hardware/compile", {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ code: code, fqbn: fqbn })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Server Compilation Error" }));
+      console.error("Compiler Reject Reason:", errorData.error);
+      return {
+        success: false,
+        error: errorData.error || "Compilation Failed on Server"
+      };
+    }
+
+    const binBlob = await response.blob();
+    const arrayBuffer = await binBlob.arrayBuffer();
+    const firmwareBytes = new Uint8Array(arrayBuffer);
+
+    return {
+      success: true,
+      firmwareBytes,
+      binBase64: btoa(String.fromCharCode.apply(null, firmwareBytes)),
+      output: "Compilation Succeeded on Render Container!"
+    };
+  } catch (err) {
+    console.warn("Render backend fetch notice:", err.message);
+  }
+
+  // Attempt 2: Axios Fallback Request
   try {
     const res = await api.post(
       "/hardware/compile", 
-      { code, fqbn },
-      { timeout: 45000 }
+      { code: code, fqbn: fqbn },
+      { 
+        headers: { "Content-Type": "application/json" },
+        timeout: 45000 
+      }
     );
     if (res.data && (res.data.success || res.data.hex || res.data.binBase64)) {
       return res.data;
     }
   } catch (err) {
-    // Silent catch so fallback executes cleanly
+    console.warn("Axios API compilation notice:", err.message);
   }
 
   // Return Verified In-Browser Code Payload for Direct Hardware Flashing
@@ -119,7 +155,7 @@ export async function compileHardwareSketch(code, fqbn = "arduino:avr:uno") {
 }
 
 // Flash compiled binary to board via Arduino CLI endpoint with syntax validation
-export async function uploadHardwareSketch(code, fqbn = "arduino:avr:uno", port = "COM3") {
+export async function uploadHardwareSketch(code, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx", port = "COM3") {
   const syntaxCheck = inspectCppCodeSyntax(code);
   if (!syntaxCheck.valid) {
     return {
@@ -134,8 +170,11 @@ export async function uploadHardwareSketch(code, fqbn = "arduino:avr:uno", port 
   try {
     const res = await api.post(
       "/hardware/upload", 
-      { code, fqbn, port },
-      { timeout: 45000 }
+      { code: code, fqbn: fqbn, port: port },
+      { 
+        headers: { "Content-Type": "application/json" },
+        timeout: 45000 
+      }
     );
     return res.data;
   } catch (err) {
