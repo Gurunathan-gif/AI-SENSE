@@ -9,23 +9,20 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Download and install Arduino CLI
+# 3. Install the Arduino CLI tool
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 ENV PATH="/bin:/usr/local/bin:${PATH}"
 
-# 4. Add official board manager URLs
+# 4. Initialize configuration and add board manager URL
 RUN arduino-cli config init && \
     arduino-cli config add board_manager.additional_urls https://downloads.arduino.cc/packages/package_index.json
 
-# 5. Install the core Zephyr compiler package
+# 5. Install the UNO Q Zephyr platform and compiler dependencies
 RUN arduino-cli core update-index && \
     arduino-cli core install arduino:zephyr
 
-# 6. Install mandatory core serial bridge libraries for UNO Q
+# 6. Install required Bridge libraries
 RUN arduino-cli lib install "Arduino_RouterBridge"
-
-# 7. DIAGNOSTIC LOG: Print all installed Zephyr board IDs directly in Docker build log
-RUN arduino-cli board listall zephyr || true
 
 WORKDIR /app/backend
 COPY backend/package*.json ./

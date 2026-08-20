@@ -12,7 +12,6 @@ app.use((req, res, next) => {
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   res.header("Access-Control-Allow-Credentials", "true");
-  
   if (req.method === "OPTIONS") {
     return res.sendStatus(200);
   }
@@ -28,7 +27,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// Base endpoints for verification
+// Server online verification endpoints
 app.get('/', (req, res) => res.status(200).json({ status: "online", system: "active" }));
 app.get('/api', (req, res) => res.status(200).json({ status: "api active" }));
 app.get('/api/hardware/compile', (req, res) => res.status(200).json({ status: "ready" }));
@@ -48,8 +47,8 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // Arduino CLI configuration for Uno Q
-    const fqbn = req.body.fqbn || "arduino:zephyr:arduino_uno_q";
+    // CORRECT OFFICIAL FQBN FOR ARDUINO UNO Q IN ZEPHYR STABLE CORE
+    const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
     const subProcess = exec(cmd, (error, stdout, stderr) => {
@@ -61,9 +60,12 @@ app.post('/api/hardware/compile', (req, res) => {
       };
 
       if (error) {
-        console.error("CLI Compiler Error:", stderr || stdout);
+        console.error("CLI Compiler Error Capture:", stderr || stdout);
         cleanup();
-        return res.status(400).json({ error: stderr || stdout || error.message });
+        return res.status(400).json({ 
+          error: "Compilation rejected by Arduino CLI", 
+          details: stderr || stdout || error.message 
+        });
       }
 
       const binPath = path.join(outputDir, `sketch_${buildId}.bin`);
@@ -75,13 +77,14 @@ app.post('/api/hardware/compile', (req, res) => {
       res.download(binPath, 'firmware.bin', () => cleanup());
     });
 
-    // Error safety trap
+    // Error safety trap for subprocess thread crashing
     subProcess.on('error', (err) => {
       console.error("Process thread error:", err);
       if (!res.headersSent) {
-        res.status(500).json({ error: "Process runtime crash prevented", details: err.message });
+        res.status(500).json({ error: "Process runtime crash prevented safely", details: err.message });
       }
     });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -95,9 +98,9 @@ app.post(['/api/compile', '/compile'], (req, res, next) => {
 
 // Protect Express from unexpected global route exceptions
 app.use((err, req, res, next) => {
-  console.error("Global Catch:", err.stack || err.message);
+  console.error("Global Catch Event:", err.stack || err.message);
   res.header("Access-Control-Allow-Origin", "*");
-  res.status(500).json({ error: "Internal Server Protected" });
+  res.status(500).json({ error: "Internal Server Protected From Crash" });
 });
 
 // Process Level Crash Handlers
