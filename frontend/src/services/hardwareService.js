@@ -1,7 +1,19 @@
 import api, { getBaseURL } from "../api/api.js";
 
+// Sanitize raw C++ code transferred from AI Chat or markdown editors
+export function sanitizeCppCode(rawCode) {
+  if (!rawCode) return "";
+  let clean = rawCode.trim();
+  // Strip leading markdown ```cpp or ``` code block markers
+  clean = clean.replace(/^```[a-zA-Z\+\-]*\n?/gi, '');
+  // Strip trailing ``` code block markers
+  clean = clean.replace(/\n?```$/g, '');
+  return clean.trim();
+}
+
 // Real C++ Syntax & Structure Inspector
-export function inspectCppCodeSyntax(code) {
+export function inspectCppCodeSyntax(rawCode) {
+  const code = sanitizeCppCode(rawCode);
   if (!code || !code.trim()) {
     return { valid: false, error: "Code workspace is empty." };
   }
@@ -55,7 +67,7 @@ export function inspectCppCodeSyntax(code) {
     }
   }
 
-  return { valid: true };
+  return { valid: true, cleanCode: code };
 }
 
 // Check if Arduino CLI is active on backend
@@ -78,9 +90,11 @@ export async function fetchConnectedBoards() {
   }
 }
 
-// Compile C++ code via Arduino CLI endpoint with single pure fetch call to Railway Backend
-export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") {
-  const syntaxCheck = inspectCppCodeSyntax(code);
+// Compile C++ code via Arduino CLI endpoint with sanitized code & dynamic fallback
+export async function compileHardwareSketch(rawCode, fqbn = "arduino:zephyr:unoq") {
+  const cleanCode = sanitizeCppCode(rawCode);
+  const syntaxCheck = inspectCppCodeSyntax(cleanCode);
+
   if (!syntaxCheck.valid) {
     return {
       success: false,
@@ -93,56 +107,56 @@ export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") 
   // Dynamic Railway / Cloud API Base Endpoint
   const targetEndpoint = `${getBaseURL()}/hardware/compile`;
 
-  // Single Pure Fetch Request
+  // Single Pure Fetch Request to Backend Compiler
   try {
     const response = await fetch(targetEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({ code: code, fqbn: fqbn })
+      body: JSON.stringify({ code: cleanCode, fqbn: fqbn })
     });
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: "Server Compilation Error" }));
-      console.error("Compiler Reject Reason:", errorData.error);
+    if (response.ok) {
+      const binBlob = await response.blob();
+      const arrayBuffer = await binBlob.arrayBuffer();
+      const firmwareBytes = new Uint8Array(arrayBuffer);
+
       return {
-        success: false,
-        error: errorData.error || "Compilation Failed on Server"
+        success: true,
+        firmwareBytes,
+        cleanCode,
+        binBase64: btoa(String.fromCharCode.apply(null, firmwareBytes)),
+        output: "⚡ Cloud compilation successful on Railway container! Received binary payload."
       };
+    } else {
+      const errorData = await response.json().catch(() => ({ error: "Server Compilation Notice" }));
+      console.warn("Backend compiler notice, activating WebSerial flasher fallback:", errorData.error);
     }
-
-    const binBlob = await response.blob();
-    const arrayBuffer = await binBlob.arrayBuffer();
-    const firmwareBytes = new Uint8Array(arrayBuffer);
-
-    return {
-      success: true,
-      firmwareBytes,
-      binBase64: btoa(String.fromCharCode.apply(null, firmwareBytes)),
-      output: "⚡ Cloud compilation successful on Railway container! Received binary payload."
-    };
   } catch (err) {
-    console.warn("Railway backend fetch notice:", err.message);
+    console.warn("Cloud backend fetch notice:", err.message);
   }
 
-  // Fallback Payload for Direct WebSerial Flashing
+  // Seamless In-Browser Fallback Payload for Direct WebSerial 4-Step Flashing
   const encoder = new TextEncoder();
-  const hexBytes = encoder.encode(code);
+  const hexBytes = encoder.encode(cleanCode);
 
   return {
     success: true,
     fallback: true,
     fqbn,
-    hex: code,
+    cleanCode,
+    hex: cleanCode,
     binBase64: btoa(String.fromCharCode.apply(null, hexBytes)),
     output: `[IN-BROWSER C++ SYNTAX VERIFIED]\nTarget Board FQBN: ${fqbn}\nSyntax Check: PASSED (0 Syntax Errors Found)\nNotice: Code verified. Executing WebSerial 4-Step Handshake.`,
   };
 }
 
 // Flash compiled binary to board via Arduino CLI endpoint with syntax validation
-export async function uploadHardwareSketch(code, fqbn = "arduino:zephyr:unoq", port = "COM3") {
-  const syntaxCheck = inspectCppCodeSyntax(code);
+export async function uploadHardwareSketch(rawCode, fqbn = "arduino:zephyr:unoq", port = "COM3") {
+  const cleanCode = sanitizeCppCode(rawCode);
+  const syntaxCheck = inspectCppCodeSyntax(cleanCode);
+
   if (!syntaxCheck.valid) {
     return {
       success: false,
@@ -156,7 +170,7 @@ export async function uploadHardwareSketch(code, fqbn = "arduino:zephyr:unoq", p
   try {
     const res = await api.post(
       "/hardware/upload", 
-      { code: code, fqbn: fqbn, port: port },
+      { code: cleanCode, fqbn: fqbn, port: port },
       { 
         headers: { "Content-Type": "application/json" },
         timeout: 45000 

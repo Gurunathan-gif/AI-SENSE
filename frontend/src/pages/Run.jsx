@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Play, Upload, Save, FolderOpen, Terminal, Activity, Zap, ShieldCheck, ArrowRight, Usb, AlertTriangle, CheckCircle2, RefreshCw, XCircle, Cpu, Settings, Code, Info, Radio } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { compileHardwareSketch, uploadHardwareSketch } from "../services/hardwareService";
+import { compileHardwareSketch, uploadHardwareSketch, sanitizeCppCode } from "../services/hardwareService";
 import { flashHexOverWebSerial, flashStm32UnoQBinary } from "../services/webSerialFlasher";
 import { uploadViaCreateAgent, flashUnoQWebUSB } from "../services/arduinoAgentFlasher";
 import { flashUnoQViaWebADB, flashUnoQWebSerialHandshake } from "../services/unoQZephyrFlasher";
@@ -64,7 +64,7 @@ void loop() {
   useEffect(() => {
     const transferredCode = localStorage.getItem("aisense_current_code");
     if (transferredCode) {
-      setCode(transferredCode);
+      setCode(sanitizeCppCode(transferredCode));
       localStorage.removeItem("aisense_current_code");
     }
   }, []);
@@ -77,8 +77,11 @@ void loop() {
     setIsCompiling(true);
     setConnectionError("");
 
+    const cleanCode = sanitizeCppCode(code);
+    setCode(cleanCode);
+
     try {
-      const res = await compileHardwareSketch(code, selectedFqbn);
+      const res = await compileHardwareSketch(cleanCode, selectedFqbn);
       if (res.success) {
         alert("🟢 C++ Compilation Passed! Code verified & firmware binary ready.");
       } else {
@@ -98,8 +101,11 @@ void loop() {
     setConnectionError("");
     setFlashProgress("Preparing code & initializing WebSerial flasher...");
 
+    const cleanCode = sanitizeCppCode(code);
+    setCode(cleanCode);
+
     try {
-      const res = await compileHardwareSketch(code, selectedFqbn);
+      const res = await compileHardwareSketch(cleanCode, selectedFqbn);
       if (!res.success) {
         setConnectionError(`Compilation Failed: ${res.error}`);
         alert(`🔴 Compilation Failed!\n${res.error}`);
@@ -116,7 +122,7 @@ void loop() {
       } else if (res.hex) {
         binaryBytes = encoder.encode(res.hex);
       } else {
-        binaryBytes = encoder.encode(code);
+        binaryBytes = encoder.encode(cleanCode);
       }
 
       if (flashMethod === "ZEPHYR_HANDSHAKE" && portRef.current) {
@@ -141,7 +147,7 @@ void loop() {
 
       if (!flashedSuccessfully && flashMethod === "AGENT") {
         setFlashProgress("Attempting connection to local Arduino Create Agent (ws://127.0.0.1:8991)...");
-        const binBase64 = res.binBase64 || btoa(code);
+        const binBase64 = res.binBase64 || btoa(cleanCode);
         const flashRes = await uploadViaCreateAgent({
           binBase64,
           fqbn: selectedFqbn,
@@ -163,7 +169,7 @@ void loop() {
         flashedSuccessfully = true;
         alert(`⚡ ${flashRes.message}`);
       } else if (!flashedSuccessfully) {
-        const uploadRes = await uploadHardwareSketch(code, selectedFqbn, targetPort);
+        const uploadRes = await uploadHardwareSketch(cleanCode, selectedFqbn, targetPort);
         if (uploadRes.success) {
           alert(`⚡ Upload Completed! Binary flashed to ${targetPort}.`);
         } else {
@@ -364,8 +370,10 @@ void loop() {
             </span>
             <button
               onClick={() => {
-                navigator.clipboard.writeText(code);
-                alert("Code copied to clipboard!");
+                const clean = sanitizeCppCode(code);
+                setCode(clean);
+                navigator.clipboard.writeText(clean);
+                alert("Clean C++ code copied to clipboard!");
               }}
               className="text-xs font-bold text-gray-400 hover:text-white"
             >
