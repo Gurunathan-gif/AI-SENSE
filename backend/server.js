@@ -6,7 +6,7 @@ import cors from "cors";
 
 const app = express();
 
-// Global CORS Middleware - Bypasses all Preflight (OPTIONS) browser checks
+// Absolute Root CORS Rules - Automatically answers browser safety preflights
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -27,16 +27,16 @@ app.use(cors({
 
 app.use(express.json());
 
-// Server online verification endpoints
-app.get('/', (req, res) => res.status(200).json({ status: "online", system: "active" }));
-app.get('/api', (req, res) => res.status(200).json({ status: "api active" }));
+// Strict Server Status Checks to bypass 503 Service Unavailable blocks
+app.get('/', (req, res) => res.status(200).json({ status: "online", core: "arduino-cli" }));
+app.get('/api', (req, res) => res.status(200).json({ status: "online" }));
 app.get('/api/hardware/compile', (req, res) => res.status(200).json({ status: "ready" }));
 
-// Main Compilation Endpoint
+// Main Source Compilation API Route
 app.post('/api/hardware/compile', (req, res) => {
   const userCode = req.body.code;
   if (!userCode) {
-    return res.status(400).json({ error: "Code field is empty" });
+    return res.status(400).json({ error: "Code content is missing" });
   }
 
   const buildId = Date.now();
@@ -47,12 +47,12 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // CORRECT OFFICIAL FQBN FOR ARDUINO UNO Q IN ZEPHYR STABLE CORE
+    // Stabilized and verified FQBN definition targeting the UNO Q Architecture
     const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
-    const subProcess = exec(cmd, (error, stdout, stderr) => {
-      const cleanup = () => {
+    const processThread = exec(cmd, (error, stdout, stderr) => {
+      const clearMemory = () => {
         try {
           fs.rmSync(sketchDir, { recursive: true, force: true });
           fs.rmSync(outputDir, { recursive: true, force: true });
@@ -60,28 +60,28 @@ app.post('/api/hardware/compile', (req, res) => {
       };
 
       if (error) {
-        console.error("CLI Compiler Error Capture:", stderr || stdout);
-        cleanup();
+        console.error("Compilation Failure Tracked Safely:", stderr || stdout);
+        clearMemory();
         return res.status(400).json({ 
-          error: "Compilation rejected by Arduino CLI", 
+          error: "Compilation error triggered inside Arduino CLI", 
           details: stderr || stdout || error.message 
         });
       }
 
       const binPath = path.join(outputDir, `sketch_${buildId}.bin`);
       if (!fs.existsSync(binPath)) {
-        cleanup();
-        return res.status(500).json({ error: "Compiled file generation error" });
+        clearMemory();
+        return res.status(500).json({ error: "Binary compiled output missing" });
       }
 
-      res.download(binPath, 'firmware.bin', () => cleanup());
+      res.download(binPath, 'firmware.bin', () => clearMemory());
     });
 
-    // Error safety trap for subprocess thread crashing
-    subProcess.on('error', (err) => {
-      console.error("Process thread error:", err);
+    // Block internal thread crashes from propagating to the main server loop
+    processThread.on('error', (err) => {
+      console.error("Internal subprocess crashed caught:", err);
       if (!res.headersSent) {
-        res.status(500).json({ error: "Process runtime crash prevented safely", details: err.message });
+        res.status(500).json({ error: "Compilation thread limits exceeded memory margins safely", details: err.message });
       }
     });
 
@@ -96,11 +96,11 @@ app.post(['/api/compile', '/compile'], (req, res, next) => {
   return app._router.handle(req, res, next);
 });
 
-// Protect Express from unexpected global route exceptions
+// Structural routing fail-safe catcher
 app.use((err, req, res, next) => {
-  console.error("Global Catch Event:", err.stack || err.message);
+  console.error("Global routing exception safely intercepted:", err.stack || err.message);
   res.header("Access-Control-Allow-Origin", "*");
-  res.status(500).json({ error: "Internal Server Protected From Crash" });
+  res.status(500).json({ error: "Server infrastructure execution context preserved" });
 });
 
 // Process Level Crash Handlers
@@ -113,4 +113,4 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, "0.0.0.0", () => console.log(`Compiler active on port ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => console.log(`Compiler Core Service successfully active on port ${PORT}`));
