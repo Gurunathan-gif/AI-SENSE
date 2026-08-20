@@ -8,7 +8,7 @@ import { flashUnoQViaWebADB, flashUnoQWebSerialHandshake } from "../services/uno
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
-  { label: "Arduino UNO Q (Qualcomm QRB2210 + STM32U585)", fqbn: "arduino:zephyr:arduino_uno_q_stm32u585xx" },
+  { label: "Arduino UNO Q (Official Zephyr RTOS)", fqbn: "arduino:zephyr:arduino_uno_q" },
   { label: "Arduino UNO R3", fqbn: "arduino:avr:uno" },
   { label: "Arduino Nano", fqbn: "arduino:avr:nano" },
   { label: "Arduino Mega 2560", fqbn: "arduino:avr:mega" },
@@ -22,7 +22,7 @@ export default function Run() {
   const [code, setCode] = useState(`/*
  * AI SENSE Live Hardware Monitor
  * Serial Baud Rate: 115200
- * Target: Arduino UNO Q (Qualcomm QRB2210 AP + STM32U585 Coprocessor)
+ * Target: Arduino UNO Q (Official Zephyr RTOS)
  */
 
 void setup() {
@@ -52,16 +52,15 @@ void loop() {
   } = useHardware();
 
   const [inputCommand, setInputCommand] = useState("");
-  const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q_stm32u585xx");
+  const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q");
   const [targetPort, setTargetPort] = useState("COM3");
-  const [flashMethod, setFlashMethod] = useState("ZEPHYR_HANDSHAKE"); // 'ZEPHYR_HANDSHAKE' | 'ZEPHYR_ADB' | 'AGENT'
+  const [flashMethod, setFlashMethod] = useState("ZEPHYR_HANDSHAKE");
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [flashProgress, setFlashProgress] = useState("");
 
   const logsEndRef = useRef(null);
 
-  // Check if AI Chat transferred code to RUN Studio
   useEffect(() => {
     const transferredCode = localStorage.getItem("aisense_current_code");
     if (transferredCode) {
@@ -74,7 +73,6 @@ void loop() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
-  // Step 1: Compile C++ Sketch with Syntax Verification
   const handleCompileArduinoCli = async () => {
     setIsCompiling(true);
     setConnectionError("");
@@ -95,14 +93,12 @@ void loop() {
     setIsCompiling(false);
   };
 
-  // Step 2: Master Multi-Method Flashing Handler with 4-Step Handshake & EOT (0x04)
   const handleCompileAndFlash = async () => {
     setIsUploading(true);
     setConnectionError("");
     setFlashProgress("Preparing code & initializing WebSerial flasher...");
 
     try {
-      // 1. Verify C++ Syntax & Generate Firmware Bytes
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (!res.success) {
         setConnectionError(`Compilation Failed: ${res.error}`);
@@ -123,7 +119,6 @@ void loop() {
         binaryBytes = encoder.encode(code);
       }
 
-      // Method A: 4-Step Handshake WebSerial Flasher (root auth -> cat > /tmp/sketch.bin -> bytes -> EOT 0x04 -> sketch load \n)
       if (flashMethod === "ZEPHYR_HANDSHAKE" && portRef.current) {
         setFlashProgress("Executing 4-Step Handshake (root -> cat > /tmp/sketch.bin -> EOT 0x04 -> sketch load \\n)...");
         const flashRes = await flashUnoQWebSerialHandshake(portRef.current, binaryBytes, (msg) => setFlashProgress(msg));
@@ -131,7 +126,6 @@ void loop() {
         alert(`⚡ ${flashRes.message}`);
       }
 
-      // Method B: Native Arduino UNO Q Zephyr RTOS WebADB 'sketch load' protocol
       if (!flashedSuccessfully && flashMethod === "ZEPHYR_ADB") {
         setFlashProgress("Connecting to Arduino UNO Q WebADB interface & pushing binary to /tmp/sketch.bin...");
         const bufferData = binaryBytes.buffer;
@@ -145,7 +139,6 @@ void loop() {
         }
       }
 
-      // Method C: Official Arduino Create Agent WebSocket Bridge
       if (!flashedSuccessfully && flashMethod === "AGENT") {
         setFlashProgress("Attempting connection to local Arduino Create Agent (ws://127.0.0.1:8991)...");
         const binBase64 = res.binBase64 || btoa(code);
@@ -164,14 +157,12 @@ void loop() {
         }
       }
 
-      // Method D: WebSerial Direct In-Browser Flasher Fallback Engine
       if (!flashedSuccessfully && portRef.current) {
         setFlashProgress("Flashing binary to target board via WebSerial 4-Step Handshake...");
         const flashRes = await flashUnoQWebSerialHandshake(portRef.current, binaryBytes, (msg) => setFlashProgress(msg));
         flashedSuccessfully = true;
         alert(`⚡ ${flashRes.message}`);
       } else if (!flashedSuccessfully) {
-        // Fallback to backend COM upload
         const uploadRes = await uploadHardwareSketch(code, selectedFqbn, targetPort);
         if (uploadRes.success) {
           alert(`⚡ Upload Completed! Binary flashed to ${targetPort}.`);
@@ -198,7 +189,6 @@ void loop() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white flex flex-col p-6 space-y-6">
-      {/* Top Toolbar */}
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
@@ -244,7 +234,6 @@ void loop() {
         </div>
       </div>
 
-      {/* Arduino UNO Q Hardware Verification Guidance Banner */}
       <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-2xl space-y-2 text-xs text-blue-300">
         <div className="flex items-center gap-2 font-bold text-white">
           <Info size={18} className="text-blue-400" /> Arduino UNO Q 4-Step Handshake Protocol Rules:
@@ -259,7 +248,6 @@ void loop() {
         </div>
       </div>
 
-      {/* Arduino CLI Compilation & Multi-Method Flashing Controls */}
       <div className="bg-slate-900 border border-blue-500/30 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-4 flex-1">
           <div>
@@ -310,7 +298,6 @@ void loop() {
         </div>
       </div>
 
-      {/* Flashing Status Progress Bar */}
       {flashProgress && (
         <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 text-blue-300 text-xs flex items-center gap-3 font-mono">
           <RefreshCw className="animate-spin text-blue-400" size={16} />
@@ -318,7 +305,6 @@ void loop() {
         </div>
       )}
 
-      {/* Hardware Connection Status Bar */}
       {isConnected ? (
         <div className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-xs flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -340,7 +326,6 @@ void loop() {
         </div>
       )}
 
-      {/* Connection / Compiler Warning Banners */}
       {deviceWarning && (
         <div className="p-4 rounded-2xl bg-red-950/40 border border-red-500/40 text-red-300 text-xs flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -371,9 +356,7 @@ void loop() {
         </div>
       )}
 
-      {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6 flex-1">
-        {/* Left 2 Cols: Code Editor Workspace */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl flex flex-col overflow-hidden">
           <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex justify-between items-center">
             <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
@@ -396,9 +379,7 @@ void loop() {
           />
         </div>
 
-        {/* Right Col: Real Hardware Telemetry & Serial Monitor */}
         <div className="space-y-6 flex flex-col">
-          {/* Live Telemetry Display */}
           <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl space-y-3">
             <div className="flex justify-between items-center">
               <h3 className="text-xs font-extrabold text-white uppercase tracking-wider flex items-center gap-2">
@@ -428,7 +409,6 @@ void loop() {
             )}
           </div>
 
-          {/* Serial Terminal */}
           <div className="bg-slate-900 border border-slate-800 rounded-2xl flex-1 flex flex-col overflow-hidden">
             <div className="bg-slate-950 px-5 py-3 border-b border-slate-800 flex justify-between items-center">
               <span className="text-xs font-bold text-blue-400 uppercase tracking-wider flex items-center gap-2">
@@ -455,7 +435,6 @@ void loop() {
               <div ref={logsEndRef} />
             </div>
 
-            {/* Terminal Input */}
             <div className="p-3 bg-slate-900 border-t border-slate-800 flex gap-2">
               <input
                 value={inputCommand}
