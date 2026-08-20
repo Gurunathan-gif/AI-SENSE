@@ -51,37 +51,40 @@ app.post('/api/hardware/compile', (req, res) => {
     const fqbn = req.body.fqbn || "arduino:zephyr:arduino_uno_q";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
-    exec(cmd, (error, stdout, stderr) => {
-      // Prevents 502 Bad Gateway by returning 400 JSON on CLI compilation errors
-      if (error) {
-        console.error("CLI Compiler Output Error:", stderr || stdout);
+    const childProc = exec(cmd, (error, stdout, stderr) => {
+      const cleanup = () => {
         try {
           fs.rmSync(sketchDir, { recursive: true, force: true });
           fs.rmSync(outputDir, { recursive: true, force: true });
         } catch (e) {}
-        
-        return res.status(400).json({ error: stderr || stdout || error.message });
+      };
+
+      if (error) {
+        console.error("COMPILER CRASH CATCH:", stderr || stdout);
+        cleanup();
+        return res.status(400).json({ 
+          error: "Compiler rejected this board execution context.",
+          details: stderr || stdout || error.message 
+        });
       }
 
       const binPath = path.join(outputDir, `sketch_${buildId}.bin`);
       if (!fs.existsSync(binPath)) {
-        try {
-          fs.rmSync(sketchDir, { recursive: true, force: true });
-          fs.rmSync(outputDir, { recursive: true, force: true });
-        } catch (e) {}
+        cleanup();
         return res.status(500).json({ error: "Compiled file generation error" });
       }
 
-      res.download(binPath, 'firmware.bin', (downloadErr) => {
-        if (downloadErr) {
-          console.error("Download Error Notice:", downloadErr.message);
-        }
-        try {
-          fs.rmSync(sketchDir, { recursive: true, force: true });
-          fs.rmSync(outputDir, { recursive: true, force: true });
-        } catch (e) {}
-      });
+      res.download(binPath, 'firmware.bin', () => cleanup());
     });
+
+    // Process-level event listener prevents child process crash from downing Express
+    childProc.on('error', (err) => {
+      console.error("Process execution crashed fundamentally:", err);
+      if (!res.headersSent) {
+        res.status(500).json({ error: "System execution thread crashed safely.", details: err.message });
+      }
+    });
+
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y \
 RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
 ENV PATH="/bin:/usr/local/bin:${PATH}"
 
-# 4. Add the official board manager URL for Arduino UNO Q
+# 4. Add official board manager URLs
 RUN arduino-cli config init && \
     arduino-cli config add board_manager.additional_urls https://downloads.arduino.cc/packages/package_index.json
 
@@ -23,6 +23,9 @@ RUN arduino-cli core update-index && \
 
 # 6. Install mandatory core serial bridge libraries for UNO Q
 RUN arduino-cli lib install "Arduino_RouterBridge"
+
+# 7. DIAGNOSTIC LOG: Print all installed Zephyr board IDs directly in Docker build log
+RUN arduino-cli board listall zephyr || true
 
 WORKDIR /app/backend
 COPY package*.json ./
