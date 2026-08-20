@@ -40,11 +40,6 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// 4. Server Root & Health Check Routes (Explicit 200 OK responses for /api and /api/)
-app.get('/', (req, res) => res.status(200).json({ status: "backend server live", message: "AI SENSE Backend Live" }));
-app.get('/api', (req, res) => res.status(200).json({ status: "api interface live", message: "API server is online" }));
-app.get('/api/', (req, res) => res.status(200).json({ status: "api interface live", message: "API server is online with slash" }));
-
 // API Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/ai", aiRoutes);
@@ -58,6 +53,16 @@ app.post(["/api/hardware/compile", "/api/compile", "/compile"], (req, res, next)
   return hardwareRoutes(req, res, next);
 });
 
+// Health Check Routes (Root, /api, /api/, and wildcard /api/* fallback)
+app.get(["/", "/api", "/api/", "/status"], (req, res) => {
+  res.status(200).json({
+    status: "api server online",
+    success: true,
+    message: "AI SENSE Backend Compiler Online",
+    timestamp: new Date().toISOString()
+  });
+});
+
 // 5. Crash-Proof Error Handling Middleware
 app.use((err, req, res, next) => {
   console.error("Unhandled Backend Exception:", err.stack || err.message);
@@ -68,7 +73,7 @@ app.use((err, req, res, next) => {
 // 404 Handler with CORS headers preserved
 app.use((req, res) => {
   res.header("Access-Control-Allow-Origin", "*");
-  res.status(404).json({ error: "Route Not Found" });
+  res.status(404).json({ error: "Route Not Found", path: req.url });
 });
 
 const PORT = parseInt(process.env.PORT, 10) || 10000;
