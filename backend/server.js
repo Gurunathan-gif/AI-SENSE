@@ -16,53 +16,33 @@ const app = express();
 // Connect MongoDB
 connectDB();
 
-const ALLOWED_ORIGINS = [
-  "https://ai-sense.vercel.app",
-  "http://localhost:5173",
-  "http://localhost:3000",
-  "http://localhost:5000"
-];
+// 1. ABSOLUTE TOP OF MIDDLEWARE CHAIN: Universal Cors Configuration
+app.use(cors({
+  origin: '*', // Allows cross-origin testing requests from any domain interface
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  credentials: true
+}));
 
-// 1. Bulletproof Manual CORS Interceptor (Executes before any route)
+// 2. Explicitly handle all preflight OPTIONS checks
+app.options('*', cors());
+
+// 3. Manual Fallback CORS Header Interceptor for 404 and error routes
 app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  if (origin && ALLOWED_ORIGINS.includes(origin)) {
-    res.header("Access-Control-Allow-Origin", origin);
-    res.header("Access-Control-Allow-Credentials", "true");
-  } else {
-    res.header("Access-Control-Allow-Origin", "*");
-  }
+  res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
-  
   if (req.method === "OPTIONS") {
     return res.status(200).end();
   }
   next();
 });
 
-// 2. Express CORS Package Middleware
-app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(null, true);
-    }
-  },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With", "Accept"],
-  credentials: true
-}));
-
 app.use(express.json());
 
-// Server Root & API Health Check Routes
+// 4. Prevent 404 crashes on empty base route variations
 app.get(["/", "/api", "/api/"], (req, res) => {
-  res.json({
-    success: true,
-    message: "AI SENSE Backend Running Cleanly on Render..."
-  });
+  res.json({ status: "compiler online", success: true, message: "AI SENSE Backend Running Cleanly on Render..." });
 });
 
 // API Routes
@@ -72,15 +52,17 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/hardware", hardwareRoutes);
 
-// Direct compile route alias handler for clean Express execution
+// Direct compile route alias handler for clean Express execution (/api/compile)
 app.use("/api/compile", (req, res, next) => {
   req.url = "/compile";
   return hardwareRoutes(req, res, next);
 });
 
-// 404 Handler
+// 404 Handler with CORS headers preserved
 app.use((req, res) => {
+  res.header("Access-Control-Allow-Origin", "*");
   res.status(404).json({
+    status: "error",
     success: false,
     message: "Route Not Found"
   });
