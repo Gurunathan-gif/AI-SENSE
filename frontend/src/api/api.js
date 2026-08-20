@@ -6,8 +6,8 @@ export const getBaseURL = () => {
   }
   
   if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    // Production Railway Docker Backend URL
-    return "https://ai-sense-backend-production.up.railway.app/api";
+    // Exact Live Railway Production Backend URL from Dashboard
+    return "https://ai-sense-production-7cb2.up.railway.app/api";
   }
   
   return "http://localhost:5000/api";

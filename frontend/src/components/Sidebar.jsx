@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Cpu, MessageSquare, Play, ShieldCheck, Terminal, Settings, LogOut, Radio } from "lucide-react";
+import { Cpu, MessageSquare, Play, ShieldCheck, Terminal, Settings, LogOut, Radio, Layers, CpuIcon, BookOpen, FolderGit2 } from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 
 export default function Sidebar({ collapsed, setCollapsed }) {
@@ -18,6 +18,10 @@ export default function Sidebar({ collapsed, setCollapsed }) {
     { label: "AI Code Studio", path: "/chat", icon: MessageSquare },
     { label: "RUN Studio", path: "/run", icon: Play },
     { label: "QC Diagnostics", path: "/qc", icon: ShieldCheck },
+    { label: "Sensor Library", path: "/sensors", icon: CpuIcon },
+    { label: "Hardware Modules", path: "/modules", icon: Layers },
+    { label: "Documentation & Docs", path: "/documentation", icon: BookOpen },
+    { label: "My Projects", path: "/projects", icon: FolderGit2 },
   ];
 
   return (
@@ -41,7 +45,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
       </div>
 
       {/* Navigation Items */}
-      <div className="flex-1 py-4 px-2 space-y-1">
+      <div className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Cpu, Terminal, Radio, Shield, Sparkles, Activity, Play, ShieldCheck, HelpCircle, LayoutDashboard, Code, Server } from "lucide-react";
+import { Cpu, Terminal, Radio, Shield, Sparkles, Activity, Play, ShieldCheck, HelpCircle, LayoutDashboard, Code, Server, Layers, CpuIcon, BookOpen } from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 
 export default function Navbar() {
@@ -46,7 +46,7 @@ export default function Navbar() {
           </div>
 
           {/* Navigation Menu */}
-          <div className="hidden md:flex items-center gap-7 text-xs font-semibold text-gray-300">
+          <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-gray-300">
             <Link to="/chat" className="hover:text-blue-400 transition">
               AI Code Studio
             </Link>
@@ -55,6 +55,15 @@ export default function Navbar() {
             </Link>
             <Link to="/qc" className="hover:text-blue-400 transition">
               QC Diagnostics
+            </Link>
+            <Link to="/sensors" className="hover:text-blue-400 transition">
+              Sensor Library
+            </Link>
+            <Link to="/modules" className="hover:text-blue-400 transition">
+              Modules
+            </Link>
+            <Link to="/documentation" className="hover:text-blue-400 transition">
+              Documentation
             </Link>
           </div>
 
