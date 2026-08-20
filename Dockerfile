@@ -1,23 +1,35 @@
-# Production Dockerfile for AI SENSE Backend Web Service
+# 1. Official Node Image
 FROM node:20-bullseye
 
-# Set working directory
-WORKDIR /app
+# 2. System dependencies for Arduino CLI and Zephyr architecture
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    python3 \
+    python3-pip \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy package files and install dependencies
-COPY package*.json ./
-COPY backend/package*.json ./backend/
+# 3. Download and install Arduino CLI
+RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+ENV PATH="/bin:/usr/local/bin:${PATH}"
+
+# 4. Add the official board manager URL for Arduino UNO Q
+RUN arduino-cli config init && \
+    arduino-cli config add board_manager.additional_urls https://downloads.arduino.cc/packages/package_index.json
+
+# 5. Install the core Zephyr compiler package
+RUN arduino-cli core update-index && \
+    arduino-cli core install arduino:zephyr
+
+# 6. Install the mandatory core serial bridge libraries
+RUN arduino-cli lib install "Arduino_RouterBridge" && \
+    arduino-cli lib install "Arduino_Bridge"
 
 WORKDIR /app/backend
+COPY backend/package*.json ./
 RUN npm install --production
 
-# Copy remaining application source code
-WORKDIR /app
-COPY . .
-
-# Expose server port
+COPY backend/ ./
 EXPOSE 10000
 
-# Start Express Backend Server
-WORKDIR /app/backend
 CMD ["node", "server.js"]
