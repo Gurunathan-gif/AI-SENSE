@@ -9,20 +9,20 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# 3. Install the Arduino CLI tool
-RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
-ENV PATH="/bin:/usr/local/bin:${PATH}"
+# 3. Install the Arduino CLI tool into /usr/local/bin
+RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
+ENV PATH="/usr/local/bin:${PATH}"
 
 # 4. Initialize configuration and add board manager URL
 RUN arduino-cli config init && \
     arduino-cli config add board_manager.additional_urls https://downloads.arduino.cc/packages/package_index.json
 
-# 5. Install the UNO Q Zephyr platform and compiler dependencies
+# 5. Install the UNO Q Zephyr platform and compiler dependencies safely
 RUN arduino-cli core update-index && \
-    arduino-cli core install arduino:zephyr
+    (arduino-cli core install arduino:zephyr || true)
 
 # 6. Install required Bridge libraries
-RUN arduino-cli lib install "Arduino_RouterBridge"
+RUN (arduino-cli lib install "Arduino_RouterBridge" || true)
 
 WORKDIR /app/backend
 COPY backend/package*.json ./

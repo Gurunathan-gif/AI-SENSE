@@ -113,4 +113,4 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, () => console.log(`Compiler active on port ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => console.log(`Compiler active on port ${PORT}`));
