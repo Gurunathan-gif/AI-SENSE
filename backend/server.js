@@ -6,14 +6,7 @@ import cors from "cors";
 
 const app = express();
 
-// Global CORS Middleware - Bypasses all Preflight (OPTIONS) browser checks
-app.use(cors({
-  origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
-  credentials: true
-}));
-
+// Absolute Top Brute-Force CORS Middleware - Bypasses all Preflight (OPTIONS) browser checks
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
@@ -25,6 +18,13 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Origin', 'X-Requested-With', 'Content-Type', 'Accept', 'Authorization'],
+  credentials: true
+}));
 
 app.use(express.json());
 

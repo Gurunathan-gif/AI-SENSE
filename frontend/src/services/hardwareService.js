@@ -78,7 +78,7 @@ export async function fetchConnectedBoards() {
   }
 }
 
-// Compile C++ code via Arduino CLI endpoint with official FQBN arduino:zephyr:unoq
+// Compile C++ code via Arduino CLI endpoint with single pure fetch call
 export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") {
   const syntaxCheck = inspectCppCodeSyntax(code);
   if (!syntaxCheck.valid) {
@@ -90,7 +90,7 @@ export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") 
     };
   }
 
-  // Attempt 1: Direct Fetch with Explicit Content-Type Header and Error Reader
+  // Single Pure Fetch Request (No dual Axios interference)
   try {
     const response = await fetch("https://ai-sense-backend.onrender.com/api/hardware/compile", {
       method: 'POST',
@@ -117,30 +117,13 @@ export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") 
       success: true,
       firmwareBytes,
       binBase64: btoa(String.fromCharCode.apply(null, firmwareBytes)),
-      output: "Compilation Succeeded on Render Container!"
+      output: "⚡ Cloud compilation successful! Received binary payload."
     };
   } catch (err) {
     console.warn("Render backend fetch notice:", err.message);
   }
 
-  // Attempt 2: Axios Fallback Request
-  try {
-    const res = await api.post(
-      "/hardware/compile", 
-      { code: code, fqbn: fqbn },
-      { 
-        headers: { "Content-Type": "application/json" },
-        timeout: 45000 
-      }
-    );
-    if (res.data && (res.data.success || res.data.hex || res.data.binBase64)) {
-      return res.data;
-    }
-  } catch (err) {
-    console.warn("Axios API compilation notice:", err.message);
-  }
-
-  // Return Verified In-Browser Code Payload for Direct Hardware Flashing
+  // Fallback Payload for Direct WebSerial Flashing
   const encoder = new TextEncoder();
   const hexBytes = encoder.encode(code);
 
