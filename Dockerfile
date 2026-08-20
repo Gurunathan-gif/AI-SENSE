@@ -1,44 +1,23 @@
-# 1. Use official Node 20 Bullseye image as base
+# Production Dockerfile for AI SENSE Backend Web Service
 FROM node:20-bullseye
 
-# 2. Install necessary system dependencies for Arduino CLI and Zephyr
-RUN apt-get update && apt-get install -y \
-    curl \
-    git \
-    python3 \
-    python3-pip \
-    && rm -rf /var/lib/apt/lists/*
+# Set working directory
+WORKDIR /app
 
-# 3. Install official Arduino CLI tool
-RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh
+# Copy package files and install dependencies
+COPY package*.json ./
+COPY backend/package*.json ./backend/
 
-# 4. Set up environment paths so system locates arduino-cli binary
-ENV PATH="/bin:/usr/local/bin:${PATH}"
+WORKDIR /app/backend
+RUN npm install --production
 
-# 5. Initialize configuration
-RUN arduino-cli config init
+# Copy remaining application source code
+WORKDIR /app
+COPY . .
 
-# 6. Install AVR and Zephyr board platforms for Arduino UNO & UNO Q
-RUN arduino-cli core update-index && \
-    (arduino-cli core install arduino:avr || true) && \
-    (arduino-cli core install arduino:zephyr || true)
-
-# 7. Install exact required Router Bridge libraries for UNO Q
-RUN (arduino-cli lib install "Arduino_RouterBridge" || true) && \
-    (arduino-cli lib install "Arduino_Bridge" || true)
-
-# 8. Establish working application directory
-WORKDIR /usr/src/app
-
-# 9. Copy package configurations and install production node packages
-COPY backend/package*.json ./
-RUN npm ci --only=production
-
-# 10. Copy remaining Node.js backend code
-COPY backend/ .
-
-# Expose Express port
+# Expose server port
 EXPOSE 10000
 
-# Start Express server application
+# Start Express Backend Server
+WORKDIR /app/backend
 CMD ["node", "server.js"]
