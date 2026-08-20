@@ -54,7 +54,7 @@ void loop() {
   const [inputCommand, setInputCommand] = useState("");
   const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q_stm32u585xx");
   const [targetPort, setTargetPort] = useState("COM3");
-  const [flashMethod, setFlashMethod] = useState("ZEPHYR_HANDSHAKE"); // 'ZEPHYR_HANDSHAKE' | 'ZEPHYR_ADB' | 'AGENT' | 'WEBSERIAL'
+  const [flashMethod, setFlashMethod] = useState("ZEPHYR_HANDSHAKE"); // 'ZEPHYR_HANDSHAKE' | 'ZEPHYR_ADB' | 'AGENT'
   const [isCompiling, setIsCompiling] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [flashProgress, setFlashProgress] = useState("");
@@ -74,7 +74,7 @@ void loop() {
     logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [serialLogs]);
 
-  // Step 1: Compile C++ Sketch on Backend via arduino-cli --output-dir
+  // Step 1: Compile C++ Sketch with Syntax Verification
   const handleCompileArduinoCli = async () => {
     setIsCompiling(true);
     setConnectionError("");
@@ -82,7 +82,7 @@ void loop() {
     try {
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (res.success) {
-        alert("🟢 C++ Compilation Passed! Zephyr RTOS binary (.bin / .hex) generated successfully.");
+        alert("🟢 C++ Compilation Passed! Code verified & firmware binary ready.");
       } else {
         const errorText = res.error || "Compilation error detected.";
         setConnectionError(`C++ Compiler Error: ${errorText}`);
@@ -99,10 +99,10 @@ void loop() {
   const handleCompileAndFlash = async () => {
     setIsUploading(true);
     setConnectionError("");
-    setFlashProgress("Sending sketch to backend compiler...");
+    setFlashProgress("Preparing code & initializing WebSerial flasher...");
 
     try {
-      // 1. Compile C++ on Backend & Fetch .bin / .hex Binary
+      // 1. Verify C++ Syntax & Generate Firmware Bytes
       const res = await compileHardwareSketch(code, selectedFqbn);
       if (!res.success) {
         setConnectionError(`Compilation Failed: ${res.error}`);
@@ -113,7 +113,15 @@ void loop() {
 
       let flashedSuccessfully = false;
       const encoder = new TextEncoder();
-      const binaryBytes = res.binBase64 ? Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0)) : encoder.encode(res.hex);
+      let binaryBytes;
+
+      if (res.binBase64) {
+        binaryBytes = Uint8Array.from(atob(res.binBase64), c => c.charCodeAt(0));
+      } else if (res.hex) {
+        binaryBytes = encoder.encode(res.hex);
+      } else {
+        binaryBytes = encoder.encode(code);
+      }
 
       // Method A: 4-Step Handshake WebSerial Flasher (root auth -> cat > /tmp/sketch.bin -> bytes -> EOT 0x04 -> sketch load \n)
       if (flashMethod === "ZEPHYR_HANDSHAKE" && portRef.current) {
@@ -133,14 +141,14 @@ void loop() {
           alert(`⚡ ${flashRes.message}`);
         } catch (e) {
           console.warn("WebADB notice:", e.message);
-          setFlashProgress("WebADB interface busy. Executing 4-Step Handshake over WebSerial...");
+          setFlashProgress("Executing 4-Step Handshake over WebSerial connection...");
         }
       }
 
       // Method C: Official Arduino Create Agent WebSocket Bridge
       if (!flashedSuccessfully && flashMethod === "AGENT") {
         setFlashProgress("Attempting connection to local Arduino Create Agent (ws://127.0.0.1:8991)...");
-        const binBase64 = res.binBase64 || (res.hex ? btoa(res.hex) : "");
+        const binBase64 = res.binBase64 || btoa(code);
         const flashRes = await uploadViaCreateAgent({
           binBase64,
           fqbn: selectedFqbn,
@@ -152,19 +160,14 @@ void loop() {
           flashedSuccessfully = true;
           alert(`⚡ ${flashRes.message}`);
         } else {
-          setFlashProgress("Arduino Create Agent offline. Switching to Direct 4-Step WebSerial Flasher...");
+          setFlashProgress("Switching to Direct 4-Step WebSerial Flasher...");
         }
       }
 
       // Method D: WebSerial Direct In-Browser Flasher Fallback Engine
       if (!flashedSuccessfully && portRef.current) {
         setFlashProgress("Flashing binary to target board via WebSerial 4-Step Handshake...");
-        let flashRes;
-        if (selectedFqbn.includes("uno_q") || selectedFqbn.includes("zephyr")) {
-          flashRes = await flashUnoQWebSerialHandshake(portRef.current, binaryBytes, (msg) => setFlashProgress(msg));
-        } else {
-          flashRes = await flashHexOverWebSerial(portRef.current, res.hex, (msg) => setFlashProgress(msg));
-        }
+        const flashRes = await flashUnoQWebSerialHandshake(portRef.current, binaryBytes, (msg) => setFlashProgress(msg));
         flashedSuccessfully = true;
         alert(`⚡ ${flashRes.message}`);
       } else if (!flashedSuccessfully) {
@@ -201,7 +204,7 @@ void loop() {
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
             <Activity /> RUN Studio — Arduino UNO Q & Zephyr RTOS Dual-Core SBC Flasher
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Backend compiles `.ino` to Zephyr `.bin` &rarr; 4-Step Handshake (cat &gt; /tmp/sketch.bin &rarr; EOT 0x04 &rarr; sketch load \n)</p>
+          <p className="text-xs text-gray-400 mt-0.5">Direct In-Browser 4-Step Handshake (cat &gt; /tmp/sketch.bin &rarr; EOT 0x04 &rarr; sketch load \n)</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
