@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { updateLiveTelemetry } from "../services/telemetryService";
+import { getBaseURL } from "../api/api";
 
 const HardwareContext = createContext();
 
@@ -49,9 +50,43 @@ export function HardwareProvider({ children }) {
   const [connectionError, setConnectionError] = useState("");
   const [deviceWarning, setDeviceWarning] = useState("");
   const [baudRate, setBaudRate] = useState("115200");
+  const [backendStatus, setBackendStatus] = useState("connected"); // Default to Green Cloud Connected Mode
 
   const portRef = useRef(null);
   const readerRef = useRef(null);
+
+  // Ping backend server health check
+  useEffect(() => {
+    const savedMode = localStorage.getItem("aisense_backend_mode");
+    if (savedMode === "fallback") {
+      setBackendStatus("fallback");
+    } else {
+      setBackendStatus("connected");
+    }
+
+    const checkBackendHealth = async () => {
+      try {
+        const response = await fetch(`${getBaseURL()}/`, { method: "GET" });
+        if (response.ok) {
+          setBackendStatus("connected");
+        }
+      } catch (e) {
+        // Retain current mode on transient notices
+      }
+    };
+
+    checkBackendHealth();
+    const interval = setInterval(checkBackendHealth, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleBackendMode = () => {
+    setBackendStatus((prev) => {
+      const nextMode = prev === "connected" ? "fallback" : "connected";
+      localStorage.setItem("aisense_backend_mode", nextMode);
+      return nextMode;
+    });
+  };
 
   // Global physical USB disconnection detection listener
   useEffect(() => {
@@ -222,6 +257,8 @@ export function HardwareProvider({ children }) {
         deviceWarning,
         baudRate,
         portRef,
+        backendStatus,
+        toggleBackendMode,
         setBaudRate,
         connectHardwarePort,
         disconnectHardwarePort,

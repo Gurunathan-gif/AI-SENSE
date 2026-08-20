@@ -6,7 +6,7 @@ import { useHardware } from "../context/HardwareContext";
 export default function Sidebar({ collapsed, setCollapsed }) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { backendStatus } = useHardware();
+  const { backendStatus, toggleBackendMode } = useHardware();
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -66,22 +66,26 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         })}
       </div>
 
-      {/* Footer & Connection Status Pill */}
+      {/* Footer & Interactive Connection Status Pill */}
       <div className="p-4 border-t border-slate-800/80 bg-slate-950/60 space-y-3">
         {!collapsed && (
-          <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] space-y-2">
+          <div 
+            onClick={toggleBackendMode}
+            title="Click to toggle between Cloud Railway Mode and Local Mode"
+            className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] space-y-2 cursor-pointer hover:border-blue-500/40 transition"
+          >
             <div className="flex items-center justify-between font-bold">
-              <span className="text-gray-400 flex items-center gap-1.5">
-                <Radio size={12} className="text-blue-500" /> Railway API
+              <span className="text-gray-300 flex items-center gap-1.5">
+                <Radio size={12} className={backendStatus === "connected" ? "text-emerald-400 animate-pulse" : "text-amber-400"} /> Railway API
               </span>
               <span
-                className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border ${
+                className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border transition ${
                   backendStatus === "connected"
                     ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/30"
                     : "bg-amber-500/10 text-amber-400 border-amber-500/30"
                 }`}
               >
-                {backendStatus === "connected" ? "Connected" : "Local Mode"}
+                {backendStatus === "connected" ? "Cloud Active" : "Local Mode"}
               </span>
             </div>
           </div>
