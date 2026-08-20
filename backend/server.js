@@ -48,7 +48,7 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
     // Official FQBN configuration for Arduino UNO Q (Zephyr RTOS)
-    const fqbn = req.body.fqbn || "arduino:zephyr:arduino_uno_q";
+    const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
     exec(cmd, (error, stdout, stderr) => {

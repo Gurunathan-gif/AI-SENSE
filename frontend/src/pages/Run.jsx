@@ -8,7 +8,7 @@ import { flashUnoQViaWebADB, flashUnoQWebSerialHandshake } from "../services/uno
 import { useHardware } from "../context/HardwareContext";
 
 const POPULAR_BOARDS = [
-  { label: "Arduino UNO Q (Official Zephyr RTOS)", fqbn: "arduino:zephyr:arduino_uno_q" },
+  { label: "Arduino UNO Q (Official Zephyr RTOS - unoq)", fqbn: "arduino:zephyr:unoq" },
   { label: "Arduino UNO R3", fqbn: "arduino:avr:uno" },
   { label: "Arduino Nano", fqbn: "arduino:avr:nano" },
   { label: "Arduino Mega 2560", fqbn: "arduino:avr:mega" },
@@ -22,7 +22,7 @@ export default function Run() {
   const [code, setCode] = useState(`/*
  * AI SENSE Live Hardware Monitor
  * Serial Baud Rate: 115200
- * Target: Arduino UNO Q (Official Zephyr RTOS)
+ * Target: Arduino UNO Q (Official Zephyr RTOS - unoq)
  */
 
 void setup() {
@@ -52,7 +52,7 @@ void loop() {
   } = useHardware();
 
   const [inputCommand, setInputCommand] = useState("");
-  const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:arduino_uno_q");
+  const [selectedFqbn, setSelectedFqbn] = useState("arduino:zephyr:unoq");
   const [targetPort, setTargetPort] = useState("COM3");
   const [flashMethod, setFlashMethod] = useState("ZEPHYR_HANDSHAKE");
   const [isCompiling, setIsCompiling] = useState(false);

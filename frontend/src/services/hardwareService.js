@@ -78,8 +78,8 @@ export async function fetchConnectedBoards() {
   }
 }
 
-// Compile C++ code via Arduino CLI endpoint with explicit JSON header and error reader
-export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx") {
+// Compile C++ code via Arduino CLI endpoint with official FQBN arduino:zephyr:unoq
+export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:unoq") {
   const syntaxCheck = inspectCppCodeSyntax(code);
   if (!syntaxCheck.valid) {
     return {
@@ -155,7 +155,7 @@ export async function compileHardwareSketch(code, fqbn = "arduino:zephyr:arduino
 }
 
 // Flash compiled binary to board via Arduino CLI endpoint with syntax validation
-export async function uploadHardwareSketch(code, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx", port = "COM3") {
+export async function uploadHardwareSketch(code, fqbn = "arduino:zephyr:unoq", port = "COM3") {
   const syntaxCheck = inspectCppCodeSyntax(code);
   if (!syntaxCheck.valid) {
     return {
