@@ -28,9 +28,10 @@ app.use(cors({
 
 app.use(express.json());
 
+// Server online status endpoints
 app.get('/', (req, res) => res.json({ status: "online", system: "active" }));
 app.get('/api', (req, res) => res.json({ status: "online", system: "api-active" }));
-app.get('/api/hardware/compile', (req, res) => res.json({ status: "ready to post" }));
+app.get('/api/hardware/compile', (req, res) => res.json({ status: "ready" }));
 
 app.post('/api/hardware/compile', (req, res) => {
   const userCode = req.body.code;
@@ -46,11 +47,12 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // Arduino CLI Official Zephyr Board ID
+    // Official Arduino Zephyr Board FQBN
     const fqbn = req.body.fqbn || "arduino:zephyr:arduino_uno_q";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
     exec(cmd, (error, stdout, stderr) => {
+      // Prevents 502 Bad Gateway by returning 400 JSON on CLI compilation errors
       if (error) {
         console.error("CLI Compiler Output Error:", stderr || stdout);
         try {
@@ -70,7 +72,10 @@ app.post('/api/hardware/compile', (req, res) => {
         return res.status(500).json({ error: "Compiled file generation error" });
       }
 
-      res.download(binPath, 'firmware.bin', () => {
+      res.download(binPath, 'firmware.bin', (downloadErr) => {
+        if (downloadErr) {
+          console.error("Download Error Notice:", downloadErr.message);
+        }
         try {
           fs.rmSync(sketchDir, { recursive: true, force: true });
           fs.rmSync(outputDir, { recursive: true, force: true });
@@ -88,11 +93,11 @@ app.post(['/api/compile', '/compile'], (req, res, next) => {
   return app._router.handle(req, res, next);
 });
 
-// Global Uncaught Exception Error Catching Middleware (Prevents 502 Bad Gateway)
+// Global Exception Catching Middleware (Prevents 502 Bad Gateway)
 app.use((err, req, res, next) => {
   console.error("Global Catching Error:", err.stack || err.message);
   res.header("Access-Control-Allow-Origin", "*");
-  res.status(500).json({ error: "Internal Server Protected", message: err.message });
+  res.status(500).json({ error: "Internal Server Protected From Crash", message: err.message });
 });
 
 // Process Level Crash Handlers
