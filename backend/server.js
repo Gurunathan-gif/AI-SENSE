@@ -16,6 +16,13 @@ const app = express();
 // Connect MongoDB
 connectDB();
 
+const ALLOWED_ORIGINS = [
+  "https://ai-sense.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000",
+  "http://localhost:5000"
+];
+
 // 1. ABSOLUTE TOP OF MIDDLEWARE CHAIN: Universal Cors Configuration
 app.use(cors({
   origin: '*', // Allows cross-origin testing requests from any domain interface
@@ -27,9 +34,10 @@ app.use(cors({
 // 2. Explicitly handle all preflight OPTIONS checks
 app.options('*', cors());
 
-// 3. Manual Fallback CORS Header Interceptor for 404 and error routes
+// 3. Manual Fallback CORS Header Interceptor
 app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Origin", "*");
+  const origin = req.headers.origin;
+  res.header("Access-Control-Allow-Origin", (origin && ALLOWED_ORIGINS.includes(origin)) ? origin : "*");
   res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
   res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization");
   if (req.method === "OPTIONS") {
@@ -40,8 +48,8 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-// 4. Prevent 404 crashes on empty base route variations
-app.get(["/", "/api", "/api/"], (req, res) => {
+// 4. Prevent 404 crashes on empty base route variations (/api, /api/, /, /status)
+app.get(["/", "/api", "/api/", "/api/status", "/status"], (req, res) => {
   res.json({ status: "compiler online", success: true, message: "AI SENSE Backend Running Cleanly on Render..." });
 });
 
@@ -52,13 +60,13 @@ app.use("/api/projects", projectRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/hardware", hardwareRoutes);
 
-// Direct compile route alias handler for clean Express execution (/api/compile)
-app.use("/api/compile", (req, res, next) => {
+// Direct compile route alias handlers for clean execution across all endpoints
+app.post(["/api/compile", "/compile", "/api/hardware/compile"], (req, res, next) => {
   req.url = "/compile";
   return hardwareRoutes(req, res, next);
 });
 
-// 404 Handler with CORS headers preserved
+// 5. 404 Handler with CORS headers preserved
 app.use((req, res) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.status(404).json({
