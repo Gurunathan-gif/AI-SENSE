@@ -21,9 +21,8 @@ RUN arduino-cli config init && \
 RUN arduino-cli core update-index && \
     arduino-cli core install arduino:zephyr
 
-# 6. Install the mandatory core serial bridge libraries
-RUN arduino-cli lib install "Arduino_RouterBridge" && \
-    arduino-cli lib install "Arduino_Bridge"
+# 6. Install mandatory core serial bridge libraries for UNO Q
+RUN arduino-cli lib install "Arduino_RouterBridge"
 
 WORKDIR /app/backend
 COPY package*.json ./
