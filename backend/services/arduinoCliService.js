@@ -48,9 +48,9 @@ export function listConnectedBoards() {
 }
 
 // Safely compile sketch in container's isolated /tmp directory and return binary payload (.bin / .hex)
-export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
+export function compileSketch({ code, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx" }) {
   return new Promise((resolve) => {
-    const cleanFqbn = sanitizeInput(fqbn) || "arduino:avr:uno";
+    const cleanFqbn = sanitizeInput(fqbn) || "arduino:zephyr:arduino_uno_q_stm32u585xx";
     const buildId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
     
     // Target container's isolated volatile /tmp directory
@@ -65,12 +65,11 @@ export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
       const sketchFile = path.join(sketchDir, `sketch_${buildId}.ino`);
       fs.writeFileSync(sketchFile, code || "// empty sketch");
 
-      // Invoke Arduino CLI to compile to binary output directory
+      // Invoke Arduino CLI to compile to binary output directory using Zephyr RTOS FQBN
       const args = ["compile", "--fqbn", cleanFqbn, "--output-dir", outputDir, sketchDir];
 
       execFile("arduino-cli", args, (err, stdout, stderr) => {
         if (err) {
-          // If compilation fails, immediately purge directories
           try { fs.rmSync(sketchDir, { recursive: true, force: true }); } catch (e) {}
           try { fs.rmSync(outputDir, { recursive: true, force: true }); } catch (e) {}
           return resolve({
@@ -131,9 +130,9 @@ export function compileSketch({ code, fqbn = "arduino:avr:uno" }) {
 }
 
 // Safely upload compiled sketch to target port
-export function uploadSketch({ code, fqbn = "arduino:avr:uno", port = "COM3" }) {
+export function uploadSketch({ code, fqbn = "arduino:zephyr:arduino_uno_q_stm32u585xx", port = "COM3" }) {
   return new Promise((resolve) => {
-    const cleanFqbn = sanitizeInput(fqbn) || "arduino:avr:uno";
+    const cleanFqbn = sanitizeInput(fqbn) || "arduino:zephyr:arduino_uno_q_stm32u585xx";
     const cleanPort = sanitizeInput(port) || "COM3";
     const buildId = Date.now() + "_" + crypto.randomBytes(4).toString("hex");
     const baseTmp = os.tmpdir() || "/tmp";
