@@ -16,7 +16,8 @@ RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/inst
     mv bin/arduino-cli /usr/local/bin/
 
 RUN arduino-cli config init && \
-    arduino-cli core update-index
+    arduino-cli core update-index && \
+    arduino-cli core install arduino:avr || true
 
 RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
     apt-get install -y nodejs && \
