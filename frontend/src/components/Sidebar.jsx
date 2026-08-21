@@ -1,6 +1,22 @@
 import React from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Cpu, MessageSquare, Play, ShieldCheck, Terminal, Settings, LogOut, Radio, Layers, CpuIcon, BookOpen, FolderGit2 } from "lucide-react";
+import { 
+  Home as HomeIcon, 
+  LayoutDashboard, 
+  Activity, 
+  ShieldCheck, 
+  MessageSquare, 
+  Layers, 
+  Play, 
+  BarChart3, 
+  FolderGit2, 
+  BookOpen, 
+  Settings, 
+  LogOut, 
+  Radio, 
+  Cpu, 
+  Terminal 
+} from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 
 export default function Sidebar({ collapsed, setCollapsed }) {
@@ -11,17 +27,21 @@ export default function Sidebar({ collapsed, setCollapsed }) {
   const handleLogout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
-    navigate("/auth");
+    navigate("/login");
   };
 
   const navItems = [
-    { label: "AI Code Studio", path: "/chat", icon: MessageSquare },
+    { label: "Home", path: "/", icon: HomeIcon },
+    { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
+    { label: "Sensor Testing", path: "/testing", icon: Activity },
+    { label: "Diagnostics", path: "/diagnostics", icon: ShieldCheck },
+    { label: "AI Assistant", path: "/chat", icon: MessageSquare },
+    { label: "Module Library", path: "/modules", icon: Layers },
     { label: "RUN Studio", path: "/run", icon: Play },
-    { label: "QC Diagnostics", path: "/qc", icon: ShieldCheck },
-    { label: "Sensor Library", path: "/sensors", icon: CpuIcon },
-    { label: "Hardware Modules", path: "/modules", icon: Layers },
-    { label: "Documentation & Docs", path: "/documentation", icon: BookOpen },
-    { label: "My Projects", path: "/projects", icon: FolderGit2 },
+    { label: "Data Analysis", path: "/analytics", icon: BarChart3 },
+    { label: "Projects", path: "/projects", icon: FolderGit2 },
+    { label: "Documentation", path: "/documentation", icon: BookOpen },
+    { label: "Settings", path: "/settings", icon: Settings },
   ];
 
   return (
@@ -30,10 +50,13 @@ export default function Sidebar({ collapsed, setCollapsed }) {
       <div className="p-4 border-b border-slate-800/80 flex items-center justify-between">
         {!collapsed && (
           <Link to="/" className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-blue-600">
+            <div className="p-1.5 rounded-lg bg-blue-600 shadow-md shadow-blue-600/30">
               <Cpu className="text-white" size={18} />
             </div>
-            <span className="font-bold text-sm text-white tracking-wide">AI SENSE</span>
+            <div>
+              <span className="font-bold text-sm text-white tracking-wide block leading-none">AI SENSE</span>
+              <span className="text-[9px] text-blue-400 font-semibold tracking-wider">HARDWARE PLATFORM</span>
+            </div>
           </Link>
         )}
         <button
@@ -71,7 +94,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         {!collapsed && (
           <div 
             onClick={toggleBackendMode}
-            title="Click to toggle between Vercel API Connected and Local Mode"
+            title="Click to toggle connection mode"
             className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] space-y-2 cursor-pointer hover:border-blue-500/40 transition"
           >
             <div className="flex items-center justify-between font-bold">

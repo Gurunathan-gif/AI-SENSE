@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Cpu, Terminal, Radio, Shield, Sparkles, Activity, Play, ShieldCheck, HelpCircle, LayoutDashboard, Code, Server, Layers, CpuIcon, BookOpen } from "lucide-react";
+import { Cpu, Server, Activity } from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 
 export default function Navbar() {
@@ -19,52 +19,35 @@ export default function Navbar() {
                 <Cpu className="text-white" size={20} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white">AI SENSE</h1>
-                <p className="text-[10px] text-gray-400">AI Powered Hardware Platform</p>
+                <h1 className="text-xl font-bold text-white tracking-wide">AI SENSE</h1>
+                <p className="text-[10px] text-gray-400">AI-Powered Hardware &amp; Sensor Platform</p>
               </div>
             </Link>
 
             {/* Connection Status Pill */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border">
               {backendStatus === "connected" && (
-                <span className="flex items-center gap-1.5 text-green-400 border-green-500/30 bg-green-500/10 px-2 py-0.5 rounded-full border">
+                <span className="flex items-center gap-1.5 text-green-400 border-green-500/30 bg-green-500/10 px-2.5 py-0.5 rounded-full border">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
                   <Server size={12} /> Vercel API Connected
                 </span>
               )}
               {backendStatus === "fallback" && (
-                <span className="flex items-center gap-1.5 text-amber-400 border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-full border">
+                <span className="flex items-center gap-1.5 text-amber-400 border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 rounded-full border">
                   <Activity size={12} /> Local Mode
-                </span>
-              )}
-              {backendStatus === "checking" && (
-                <span className="text-gray-400 border-slate-800 bg-slate-900 px-2 py-0.5 rounded-full border">
-                  Checking API Connection...
                 </span>
               )}
             </div>
           </div>
 
-          {/* Navigation Menu */}
-          <div className="hidden md:flex items-center gap-6 text-xs font-semibold text-gray-300">
-            <Link to="/chat" className="hover:text-blue-400 transition">
-              AI Code Studio
-            </Link>
-            <Link to="/run" className="hover:text-blue-400 transition">
-              RUN Studio
-            </Link>
-            <Link to="/qc" className="hover:text-blue-400 transition">
-              QC Diagnostics
-            </Link>
-            <Link to="/sensors" className="hover:text-blue-400 transition">
-              Sensor Library
-            </Link>
-            <Link to="/modules" className="hover:text-blue-400 transition">
-              Modules
-            </Link>
-            <Link to="/documentation" className="hover:text-blue-400 transition">
-              Documentation
-            </Link>
+          {/* Top Quick Links */}
+          <div className="hidden lg:flex items-center gap-6 text-xs font-semibold text-gray-300">
+            <Link to="/dashboard" className="hover:text-blue-400 transition">Dashboard</Link>
+            <Link to="/testing" className="hover:text-blue-400 transition">Sensor Testing</Link>
+            <Link to="/diagnostics" className="hover:text-blue-400 transition">Diagnostics</Link>
+            <Link to="/chat" className="hover:text-blue-400 transition">AI Assistant</Link>
+            <Link to="/run" className="hover:text-blue-400 transition">RUN Studio</Link>
+            <Link to="/analytics" className="hover:text-blue-400 transition">Analytics</Link>
           </div>
 
         </div>

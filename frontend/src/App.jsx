@@ -1,21 +1,23 @@
+import React from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Layout from "./components/Layout";
 import { HardwareProvider } from "./context/HardwareContext";
 
 import Home from "./pages/Home";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
+import SensorTesting from "./pages/SensorTesting";
+import Diagnostics from "./pages/Diagnostics";
 import AIChat from "./pages/AIChat";
 import Modules from "./pages/Modules";
-import SensorLab from "./pages/SensorLab";
-import QualityCheck from "./pages/QualityCheck";
 import Run from "./pages/Run";
-import Documentation from "./pages/Documentation";
-import NotFound from "./pages/Notfound";
-import Profile from "./pages/Profile";
-import SettingsPage from "./pages/Settings";
+import DataAnalysis from "./pages/DataAnalysis";
 import Projects from "./pages/Projects";
+import Documentation from "./pages/Documentation";
+import SettingsPage from "./pages/Settings";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Profile from "./pages/Profile";
+import NotFound from "./pages/Notfound";
 
 function App() {
   return (
@@ -24,17 +26,20 @@ function App() {
         <Layout>
           <Routes>
             <Route path="/" element={<Home />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/testing" element={<SensorTesting />} />
+            <Route path="/sensors" element={<SensorTesting />} />
+            <Route path="/diagnostics" element={<Diagnostics />} />
+            <Route path="/qc" element={<Diagnostics />} />
             <Route path="/chat" element={<AIChat />} />
             <Route path="/modules" element={<Modules />} />
-            <Route path="/sensors" element={<SensorLab />} />
-            <Route path="/qc" element={<QualityCheck />} />
             <Route path="/run" element={<Run />} />
-            <Route path="/documentation" element={<Documentation />} />
+            <Route path="/analytics" element={<DataAnalysis />} />
             <Route path="/projects" element={<Projects />} />
+            <Route path="/documentation" element={<Documentation />} />
             <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
