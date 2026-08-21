@@ -26,11 +26,14 @@ export default function Run() {
  */
 
 void setup() {
-  Serial.begin(115200);
+  pinMode(LED_BUILTIN, OUTPUT);
 }
 
 void loop() {
-  // Telemetry stream will display here once physical microcontroller is connected
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(200);
+  digitalWrite(LED_BUILTIN, LOW);
+  delay(200);
 }`);
 
   const {
@@ -99,7 +102,7 @@ void loop() {
   const handleCompileAndFlash = async () => {
     setIsUploading(true);
     setConnectionError("");
-    setFlashProgress("Preparing code & initializing WebSerial flasher...");
+    setFlashProgress("Preparing code bytes & initializing WebSerial flasher...");
 
     const cleanCode = sanitizeCppCode(code);
     setCode(cleanCode);
@@ -125,9 +128,21 @@ void loop() {
         binaryBytes = encoder.encode(cleanCode);
       }
 
-      if (flashMethod === "ZEPHYR_HANDSHAKE" && portRef.current) {
-        setFlashProgress("Executing 4-Step Handshake (root -> cat > /tmp/sketch.bin -> EOT 0x04 -> sketch load \\n)...");
-        const flashRes = await flashUnoQWebSerialHandshake(portRef.current, binaryBytes, (msg) => setFlashProgress(msg));
+      // Ensure active hardware port connection
+      let activePort = portRef.current;
+      if (!activePort && "serial" in navigator) {
+        setFlashProgress("Please select your physical Arduino UNO Q USB Port in the popup...");
+        try {
+          const connected = await connectHardwarePort(baudRate);
+          if (connected) activePort = portRef.current;
+        } catch (e) {
+          console.warn("On-the-fly port connect notice:", e.message);
+        }
+      }
+
+      if (flashMethod === "ZEPHYR_HANDSHAKE" && activePort) {
+        setFlashProgress("Executing 8-step Handshake (root -> cat > /tmp/sketch.bin -> EOT 0x04 -> sketch load)...");
+        const flashRes = await flashUnoQWebSerialHandshake(activePort, binaryBytes, (msg) => setFlashProgress(msg));
         flashedSuccessfully = true;
         alert(`⚡ ${flashRes.message}`);
       }
@@ -141,7 +156,7 @@ void loop() {
           alert(`⚡ ${flashRes.message}`);
         } catch (e) {
           console.warn("WebADB notice:", e.message);
-          setFlashProgress("Executing 4-Step Handshake over WebSerial connection...");
+          setFlashProgress("Executing 8-Step Handshake over WebSerial connection...");
         }
       }
 
@@ -159,13 +174,13 @@ void loop() {
           flashedSuccessfully = true;
           alert(`⚡ ${flashRes.message}`);
         } else {
-          setFlashProgress("Switching to Direct 4-Step WebSerial Flasher...");
+          setFlashProgress("Switching to Direct 8-Step WebSerial Flasher...");
         }
       }
 
-      if (!flashedSuccessfully && portRef.current) {
-        setFlashProgress("Flashing binary to target board via WebSerial 4-Step Handshake...");
-        const flashRes = await flashUnoQWebSerialHandshake(portRef.current, binaryBytes, (msg) => setFlashProgress(msg));
+      if (!flashedSuccessfully && activePort) {
+        setFlashProgress("Flashing binary to target board via WebSerial 8-Step Handshake...");
+        const flashRes = await flashUnoQWebSerialHandshake(activePort, binaryBytes, (msg) => setFlashProgress(msg));
         flashedSuccessfully = true;
         alert(`⚡ ${flashRes.message}`);
       } else if (!flashedSuccessfully) {
@@ -198,9 +213,9 @@ void loop() {
       <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-blue-500 flex items-center gap-2">
-            <Activity /> RUN Studio — Arduino UNO Q & Zephyr RTOS Dual-Core SBC Flasher
+            <Activity /> RUN Studio — Arduino UNO Q &amp; Zephyr RTOS Dual-Core SBC Flasher
           </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Direct In-Browser 4-Step Handshake (cat &gt; /tmp/sketch.bin &rarr; EOT 0x04 &rarr; sketch load \n)</p>
+          <p className="text-xs text-gray-400 mt-0.5">Direct In-Browser 8-Step Handshake (cat &gt; /tmp/sketch.bin &rarr; EOT 0x04 &rarr; sketch load \n)</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
@@ -242,7 +257,7 @@ void loop() {
 
       <div className="bg-blue-950/40 border border-blue-500/30 p-4 rounded-2xl space-y-2 text-xs text-blue-300">
         <div className="flex items-center gap-2 font-bold text-white">
-          <Info size={18} className="text-blue-400" /> Arduino UNO Q 4-Step Handshake Protocol Rules:
+          <Info size={18} className="text-blue-400" /> Arduino UNO Q 8-Step Handshake Protocol Rules:
         </div>
         <div className="grid md:grid-cols-2 gap-3 pt-1 text-[11px] text-gray-300">
           <div className="bg-slate-950/60 p-2.5 rounded-xl border border-slate-800">
@@ -276,7 +291,7 @@ void loop() {
               onChange={(e) => setFlashMethod(e.target.value)}
               className="bg-slate-950 border border-slate-800 text-xs font-bold text-emerald-400 rounded-xl px-3 py-2 focus:outline-none focus:border-emerald-500"
             >
-              <option value="ZEPHYR_HANDSHAKE">⚡ Method A: 4-Step Handshake (EOT 0x04 + ACK Monitor)</option>
+              <option value="ZEPHYR_HANDSHAKE">⚡ Method A: 8-Step Handshake (EOT 0x04 + ACK Monitor)</option>
               <option value="ZEPHYR_ADB">🌐 Method B: WebADB + Zephyr 'sketch load' (UNO Q Native)</option>
               <option value="AGENT">⚡ Method C: Arduino Create Agent (ws://127.0.0.1:8991)</option>
             </select>
@@ -316,7 +331,7 @@ void loop() {
           <div className="flex items-center gap-3">
             <CheckCircle2 size={20} className="text-emerald-400 shrink-0" />
             <div>
-              <span className="font-extrabold text-white">{hardwareInfo?.boardName}</span> — Connected & Persistent (VID: <code className="text-emerald-400">{hardwareInfo?.hexVid}</code>, PID: <code className="text-emerald-400">{hardwareInfo?.hexPid}</code>)
+              <span className="font-extrabold text-white">{hardwareInfo?.boardName}</span> — Connected &amp; Persistent (VID: <code className="text-emerald-400">{hardwareInfo?.hexVid}</code>, PID: <code className="text-emerald-400">{hardwareInfo?.hexPid}</code>)
             </div>
           </div>
           <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold uppercase tracking-wider">
