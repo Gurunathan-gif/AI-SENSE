@@ -1,16 +1,20 @@
 import axios from "axios";
 
 export const getBaseURL = () => {
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL.replace(/\/+$/, "");
-  }
+  let url = import.meta.env.VITE_API_URL;
   
-  if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    // Exact Live Railway Production Backend URL from Dashboard
-    return "https://ai-sense-production-25f4.up.railway.app/api";
+  if (!url || !url.trim()) {
+    if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+      return "https://ai-sense-production-25f4.up.railway.app/api";
+    }
+    return "http://localhost:5000/api";
   }
-  
-  return "http://localhost:5000/api";
+
+  url = url.trim();
+  if (!url.startsWith("http://") && !url.startsWith("https://")) {
+    url = `https://${url}`;
+  }
+  return url.replace(/\/+$/, "");
 };
 
 const api = axios.create({
