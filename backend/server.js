@@ -47,7 +47,7 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // Stabilized and verified FQBN definition targeting the UNO Q Architecture
+    // Target FQBN definition for compilation
     const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
     const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
@@ -62,9 +62,10 @@ app.post('/api/hardware/compile', (req, res) => {
       if (error) {
         console.error("Compilation Failure Tracked Safely:", stderr || stdout);
         clearMemory();
+        const compilerErrorMsg = (stderr || stdout || error.message || "").trim();
         return res.status(400).json({ 
-          error: "Compilation error triggered inside Arduino CLI", 
-          details: stderr || stdout || error.message 
+          error: compilerErrorMsg || "Compilation error triggered inside Arduino CLI", 
+          details: compilerErrorMsg 
         });
       }
 

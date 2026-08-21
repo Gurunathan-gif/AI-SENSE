@@ -90,7 +90,7 @@ export async function fetchConnectedBoards() {
   }
 }
 
-// Compile C++ code via Arduino CLI endpoint with sanitized code & dynamic fallback
+// Compile C++ code via Arduino CLI endpoint with sanitized code & dynamic error reader
 export async function compileHardwareSketch(rawCode, fqbn = "arduino:zephyr:unoq") {
   const cleanCode = sanitizeCppCode(rawCode);
   const syntaxCheck = inspectCppCodeSyntax(cleanCode);
@@ -131,13 +131,19 @@ export async function compileHardwareSketch(rawCode, fqbn = "arduino:zephyr:unoq
       };
     } else {
       const errorData = await response.json().catch(() => ({ error: "Server Compilation Notice" }));
-      console.warn("Backend compiler notice, activating WebSerial flasher fallback:", errorData.error);
+      const reason = errorData.error || errorData.details || "Compilation rejected by server";
+      console.error("Compiler Reject Reason:", reason);
+      return {
+        success: false,
+        error: reason,
+        details: reason
+      };
     }
   } catch (err) {
     console.warn("Cloud backend fetch notice:", err.message);
   }
 
-  // Seamless In-Browser Fallback Payload for Direct WebSerial 4-Step Flashing
+  // In-Browser Fallback Payload for Direct WebSerial 4-Step Flashing
   const encoder = new TextEncoder();
   const hexBytes = encoder.encode(cleanCode);
 
