@@ -29,12 +29,12 @@ export default function Navbar() {
               {backendStatus === "connected" && (
                 <span className="flex items-center gap-1.5 text-green-400 border-green-500/30 bg-green-500/10 px-2 py-0.5 rounded-full border">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
-                  <Server size={12} /> Railway API Connected
+                  <Server size={12} /> Vercel API Connected
                 </span>
               )}
               {backendStatus === "fallback" && (
                 <span className="flex items-center gap-1.5 text-amber-400 border-amber-500/30 bg-amber-500/10 px-2 py-0.5 rounded-full border">
-                  <Activity size={12} /> Cloud Local Mode
+                  <Activity size={12} /> Local Mode
                 </span>
               )}
               {backendStatus === "checking" && (

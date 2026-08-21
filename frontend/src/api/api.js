@@ -1,20 +1,20 @@
 import axios from "axios";
 
 export const getBaseURL = () => {
-  let url = import.meta.env.VITE_API_URL;
-  
-  if (!url || !url.trim()) {
-    if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-      return "https://ai-sense-production-25f4.up.railway.app/api";
+  if (import.meta.env.VITE_API_URL) {
+    let url = import.meta.env.VITE_API_URL.trim();
+    if (!url.startsWith("http://") && !url.startsWith("https://")) {
+      url = `https://${url}`;
     }
-    return "http://localhost:5000/api";
+    return url.replace(/\/+$/, "");
   }
-
-  url = url.trim();
-  if (!url.startsWith("http://") && !url.startsWith("https://")) {
-    url = `https://${url}`;
+  
+  if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
+    // Direct Vercel Serverless Function Route on same origin
+    return "/api";
   }
-  return url.replace(/\/+$/, "");
+  
+  return "/api";
 };
 
 const api = axios.create({

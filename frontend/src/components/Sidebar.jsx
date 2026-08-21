@@ -71,12 +71,12 @@ export default function Sidebar({ collapsed, setCollapsed }) {
         {!collapsed && (
           <div 
             onClick={toggleBackendMode}
-            title="Click to toggle between Cloud Railway Mode and Local Mode"
+            title="Click to toggle between Vercel API Connected and Local Mode"
             className="p-3 rounded-xl bg-slate-900 border border-slate-800 text-[11px] space-y-2 cursor-pointer hover:border-blue-500/40 transition"
           >
             <div className="flex items-center justify-between font-bold">
               <span className="text-gray-300 flex items-center gap-1.5">
-                <Radio size={12} className={backendStatus === "connected" ? "text-emerald-400 animate-pulse" : "text-amber-400"} /> Railway API
+                <Radio size={12} className={backendStatus === "connected" ? "text-emerald-400 animate-pulse" : "text-amber-400"} /> Vercel API
               </span>
               <span
                 className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border transition ${
@@ -85,7 +85,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                     : "bg-amber-500/10 text-amber-400 border-amber-500/30"
                 }`}
               >
-                {backendStatus === "connected" ? "Cloud Active" : "Local Mode"}
+                {backendStatus === "connected" ? "Vercel Active" : "Local Mode"}
               </span>
             </div>
           </div>
