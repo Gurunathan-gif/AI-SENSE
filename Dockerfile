@@ -1,38 +1,36 @@
-# 1. Official clean bullseye node base image
-FROM node:20-bullseye
+FROM ubuntu:22.04
 
-# 2. Prevent interactive prompt freezes inside docker build threads
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 3. Install baseline operating system prerequisites and clear caches instantly
 RUN apt-get update && apt-get install -y \
     curl \
-    git \
+    ca-certificates \
+    build-essential \
     python3 \
-    python3-pip \
+    git \
+    wget \
+    xz-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# 4. Pull down the official compressed Arduino CLI tool package into /usr/local/bin
-RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR=/usr/local/bin sh
-ENV PATH="/usr/local/bin:${PATH}"
+RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sh -s 1.1.1 && \
+    mv bin/arduino-cli /usr/local/bin/
 
-# 5. Connect to the official Arduino registry index
 RUN arduino-cli config init && \
-    arduino-cli config add board_manager.additional_urls https://downloads.arduino.cc/packages/package_index.json
+    arduino-cli core update-index
 
-# 6. Install the Zephyr compiler packages with forced memory optimizations
-RUN arduino-cli core update-index && \
-    (arduino-cli core install arduino:zephyr || true)
+RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    apt-get install -y nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
-# 7. Wire the mandatory router dependencies used by the board core
-RUN (arduino-cli lib install "Arduino_RouterBridge" || true)
-
-# 8. Setup production isolation folders
 WORKDIR /app/backend
+
 COPY backend/package*.json ./
-RUN npm ci --only=production
+RUN npm install --production
+
 COPY backend/ ./
 
-# 9. Bind host explicitly to port 10000 required by Render Docs
 EXPOSE 10000
+
+ENV PORT=10000
+
 CMD ["node", "server.js"]

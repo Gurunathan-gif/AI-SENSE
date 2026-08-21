@@ -27,7 +27,7 @@ app.use(cors({
 
 app.use(express.json());
 
-// Strict Server Status Checks to bypass 503 Service Unavailable blocks
+// Health Check & System Status Routes
 app.get('/', (req, res) => res.status(200).json({ status: "online", core: "arduino-cli" }));
 app.get('/api', (req, res) => res.status(200).json({ status: "online" }));
 app.get('/api/hardware/compile', (req, res) => res.status(200).json({ status: "ready" }));
