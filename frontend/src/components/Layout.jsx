@@ -26,7 +26,7 @@ export default function Layout({ children }) {
       <Sidebar />
 
       {/* Main Page Workspace Content */}
-      <main className="flex-1 pl-72 transition-all duration-300 min-h-screen overflow-x-hidden">
+      <main className="flex-1 transition-all duration-300 min-h-screen overflow-x-hidden">
         {children}
       </main>
     </div>
