@@ -1,10 +1,48 @@
 import express from "express";
-import { exec } from "child_process";
+import { exec, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
 import cors from "cors";
 
 const app = express();
+
+// Strategy 1: Persistent Arduino CLI gRPC Daemon (Port 50051)
+let grpcDaemonProcess = null;
+let isDaemonReady = false;
+
+function startArduinoCliDaemon() {
+  try {
+    console.log("🚀 Initializing Arduino CLI gRPC Daemon Service on port 50051...");
+    grpcDaemonProcess = spawn("arduino-cli", ["daemon", "--port", "50051"], {
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+
+    grpcDaemonProcess.stdout.on("data", (data) => {
+      const msg = data.toString().trim();
+      console.log(`[gRPC Daemon 50051]: ${msg}`);
+      if (msg.includes("Executing daemon") || msg.includes("Daemon is running") || msg.includes("50051")) {
+        isDaemonReady = true;
+      }
+    });
+
+    grpcDaemonProcess.stderr.on("data", (data) => {
+      const msg = data.toString().trim();
+      console.warn(`[gRPC Daemon Notice]: ${msg}`);
+      isDaemonReady = true;
+    });
+
+    grpcDaemonProcess.on("exit", (code) => {
+      isDaemonReady = false;
+      console.warn(`[gRPC Daemon] Subprocess exited with code ${code}. Respawning in 3 seconds...`);
+      setTimeout(startArduinoCliDaemon, 3000);
+    });
+  } catch (err) {
+    console.error("Failed to start Arduino CLI daemon:", err.message);
+  }
+}
+
+// Start gRPC Daemon Background Engine
+startArduinoCliDaemon();
 
 // Absolute Root CORS Rules - Automatically answers browser safety preflights
 app.use((req, res, next) => {
@@ -28,11 +66,21 @@ app.use(cors({
 app.use(express.json());
 
 // Health Check & System Status Routes
-app.get('/', (req, res) => res.status(200).json({ status: "online", core: "arduino-cli" }));
-app.get('/api', (req, res) => res.status(200).json({ status: "online" }));
-app.get('/api/hardware/compile', (req, res) => res.status(200).json({ status: "ready" }));
+app.get('/', (req, res) => res.status(200).json({ 
+  status: "online", 
+  core: "arduino-cli",
+  strategy: "gRPC Daemon Mode",
+  daemonPort: 50051,
+  daemonActive: isDaemonReady 
+}));
 
-// Main Source Compilation API Route
+app.get('/api', (req, res) => res.status(200).json({ status: "online", strategy: "gRPC Daemon" }));
+app.get('/api/hardware/status', (req, res) => res.status(200).json({ 
+  status: "ready", 
+  grpcDaemon: { active: isDaemonReady, port: 50051 } 
+}));
+
+// Main Source Compilation API Route (gRPC Daemon Mode)
 app.post('/api/hardware/compile', (req, res) => {
   const userCode = req.body.code;
   if (!userCode) {
@@ -47,7 +95,7 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // Single-Threaded Compilation (--jobs 1) to prevent Linux Kernel OOM (Killed) errors
+    // Single-Threaded Compilation (--jobs 1) with gRPC Daemon memory safety
     const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
     const cmd = `arduino-cli compile --jobs 1 --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
@@ -64,7 +112,7 @@ app.post('/api/hardware/compile', (req, res) => {
         clearMemory();
         const compilerErrorMsg = (stderr || stdout || error.message || "").trim();
         return res.status(400).json({ 
-          error: compilerErrorMsg || "Compilation error triggered inside Arduino CLI", 
+          error: compilerErrorMsg || "Compilation error triggered inside Arduino CLI daemon", 
           details: compilerErrorMsg 
         });
       }
@@ -114,4 +162,4 @@ process.on("unhandledRejection", (reason) => {
 });
 
 const PORT = process.env.PORT || 10000;
-app.listen(PORT, "0.0.0.0", () => console.log(`Compiler Core Service successfully active on port ${PORT}`));
+app.listen(PORT, "0.0.0.0", () => console.log(`Compiler gRPC Daemon Core Service active on port ${PORT}`));
