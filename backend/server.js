@@ -47,9 +47,9 @@ app.post('/api/hardware/compile', (req, res) => {
     fs.mkdirSync(sketchDir, { recursive: true });
     fs.writeFileSync(path.join(sketchDir, `sketch_${buildId}.ino`), userCode);
 
-    // Target FQBN definition for compilation
+    // Single-Threaded Compilation (--jobs 1) to prevent Linux Kernel OOM (Killed) errors
     const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
-    const cmd = `arduino-cli compile --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
+    const cmd = `arduino-cli compile --jobs 1 --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
 
     const processThread = exec(cmd, (error, stdout, stderr) => {
       const clearMemory = () => {
