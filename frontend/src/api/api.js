@@ -1,27 +1,13 @@
 import axios from "axios";
 
+// 100% Pure Localhost Base API URL Engine (Port 10000)
 export const getBaseURL = () => {
-  if (import.meta.env.VITE_API_URL) {
-    let url = import.meta.env.VITE_API_URL.trim();
-    if (!url.startsWith("http://") && !url.startsWith("https://")) {
-      url = `https://${url}`;
-    }
-    return url.replace(/\/+$/, "");
-  }
-  
-  if (typeof window !== "undefined" && window.location) {
-    const host = window.location.hostname;
-    if (host === "localhost" || host === "127.0.0.1") {
-      return "http://localhost:10000/api";
-    }
-  }
-  
-  return "/api";
+  return "http://localhost:10000/api";
 };
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 10000,
+  timeout: 30000,
 });
 
 api.interceptors.request.use((config) => {

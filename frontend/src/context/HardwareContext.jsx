@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from "react";
 import { updateLiveTelemetry } from "../services/telemetryService";
-import { getBaseURL } from "../api/api";
 
 const HardwareContext = createContext();
 
@@ -55,45 +54,30 @@ export function HardwareProvider({ children }) {
   const portRef = useRef(null);
   const readerRef = useRef(null);
 
-  // Ping backend server health check safely
+  // Ping local Express backend server (http://localhost:10000/api/hardware/status)
   useEffect(() => {
-    const savedMode = localStorage.getItem("aisense_backend_mode");
-    if (savedMode === "fallback") {
-      setBackendStatus("fallback");
-    }
-
     const checkBackendHealth = async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        const response = await fetch(`${getBaseURL()}/`, { 
-          method: "GET",
-          signal: controller.signal 
+        const response = await fetch("http://localhost:10000/api/hardware/status", { 
+          method: "GET" 
         });
-        clearTimeout(timeoutId);
-
         if (response.ok) {
           setBackendStatus("connected");
         } else {
           setBackendStatus("fallback");
         }
       } catch (e) {
-        // Fall back to Local Mode smoothly if backend server is not running
         setBackendStatus("fallback");
       }
     };
 
     checkBackendHealth();
-    const interval = setInterval(checkBackendHealth, 30000);
+    const interval = setInterval(checkBackendHealth, 15000);
     return () => clearInterval(interval);
   }, []);
 
   const toggleBackendMode = () => {
-    setBackendStatus((prev) => {
-      const nextMode = prev === "connected" ? "fallback" : "connected";
-      localStorage.setItem("aisense_backend_mode", nextMode);
-      return nextMode;
-    });
+    setBackendStatus((prev) => (prev === "connected" ? "fallback" : "connected"));
   };
 
   // Global physical USB disconnection detection listener
@@ -133,7 +117,6 @@ export function HardwareProvider({ children }) {
         });
       } catch (filterErr) {
         if (filterErr.name === "NotFoundError") throw filterErr;
-        // Fallback for Bluetooth serial blocklist warnings
         port = await navigator.serial.requestPort();
       }
 

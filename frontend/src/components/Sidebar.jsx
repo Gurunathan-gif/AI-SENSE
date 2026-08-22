@@ -55,7 +55,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
             </div>
             <div>
               <span className="font-bold text-sm text-white tracking-wide block leading-none">AI SENSE</span>
-              <span className="text-[9px] text-blue-400 font-semibold tracking-wider">HARDWARE PLATFORM</span>
+              <span className="text-[9px] text-blue-400 font-semibold tracking-wider">LOCAL HARDWARE</span>
             </div>
           </Link>
         )}
@@ -99,7 +99,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
           >
             <div className="flex items-center justify-between font-bold">
               <span className="text-gray-300 flex items-center gap-1.5">
-                <Radio size={12} className={backendStatus === "connected" ? "text-emerald-400 animate-pulse" : "text-amber-400"} /> Vercel API
+                <Radio size={12} className={backendStatus === "connected" ? "text-emerald-400 animate-pulse" : "text-amber-400"} /> Local API
               </span>
               <span
                 className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold border transition ${
@@ -108,7 +108,7 @@ export default function Sidebar({ collapsed, setCollapsed }) {
                     : "bg-amber-500/10 text-amber-400 border-amber-500/30"
                 }`}
               >
-                {backendStatus === "connected" ? "Vercel Active" : "Local Mode"}
+                {backendStatus === "connected" ? "Port 10000" : "Local Mode"}
               </span>
             </div>
           </div>

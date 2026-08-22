@@ -24,17 +24,22 @@ export default function Navbar() {
               </div>
             </Link>
 
-            {/* Connection Status Pill */}
+            {/* Local Connection Status Pill */}
             <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-extrabold border">
               {backendStatus === "connected" && (
                 <span className="flex items-center gap-1.5 text-green-400 border-green-500/30 bg-green-500/10 px-2.5 py-0.5 rounded-full border">
                   <span className="w-2 h-2 rounded-full bg-green-400 animate-ping" />
-                  <Server size={12} /> Vercel API Connected
+                  <Server size={12} /> Local API Connected (Port 10000)
                 </span>
               )}
               {backendStatus === "fallback" && (
                 <span className="flex items-center gap-1.5 text-amber-400 border-amber-500/30 bg-amber-500/10 px-2.5 py-0.5 rounded-full border">
-                  <Activity size={12} /> Local Mode
+                  <Activity size={12} /> Local Mode Active
+                </span>
+              )}
+              {backendStatus === "checking" && (
+                <span className="text-gray-400 border-slate-800 bg-slate-900 px-2.5 py-0.5 rounded-full border">
+                  Checking Local API...
                 </span>
               )}
             </div>
