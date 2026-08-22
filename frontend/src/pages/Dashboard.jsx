@@ -13,19 +13,20 @@ import {
   ArrowRight, 
   BarChart3, 
   FolderGit2, 
-  Zap 
+  Zap, 
+  Usb 
 } from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { isConnected, hardwareInfo } = useHardware();
+  const { isConnected, hardwareInfo, connectHardwarePort } = useHardware();
 
   const sensorHealthList = [
-    { name: "DHT22", type: "Temperature & Humidity", status: "Good", healthScore: 94, iconColor: "text-emerald-400", badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
-    { name: "MQ-6", type: "LPG Gas Sensor", status: "Warning", healthScore: 78, iconColor: "text-amber-400", badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
-    { name: "LDR", type: "Light Intensity Sensor", status: "Good", healthScore: 97, iconColor: "text-emerald-400", badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
-    { name: "MPU6050", type: "6-Axis Gyro & Accel", status: "Good", healthScore: 91, iconColor: "text-emerald-400", badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+    { name: "DHT22", type: "Temperature & Humidity", status: "Good", healthScore: 94, badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+    { name: "MQ-6", type: "LPG Gas Sensor", status: "Warning", healthScore: 78, badgeClass: "bg-amber-500/10 text-amber-400 border-amber-500/30" },
+    { name: "LDR", type: "Light Intensity Sensor", status: "Good", healthScore: 97, badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
+    { name: "MPU6050", type: "6-Axis Gyro & Accel", status: "Good", healthScore: 91, badgeClass: "bg-emerald-500/10 text-emerald-400 border-emerald-500/30" },
   ];
 
   return (
@@ -39,11 +40,21 @@ export default function Dashboard() {
           <p className="text-xs text-gray-400 mt-1">Real-Time Sensor Monitoring, Hardware Diagnostics &amp; Edge AI Engine</p>
         </div>
 
-        {/* Board Status Pill */}
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs font-bold text-emerald-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <span>{isConnected ? (hardwareInfo?.boardName || "Arduino UNO Q") : "Arduino UNO Q"} 🟢 Connected</span>
-        </div>
+        {/* Dynamic Physical Board Connection Badge */}
+        {isConnected ? (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>{hardwareInfo?.boardName || "Arduino UNO Q"} 🟢 Connected</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => connectHardwarePort()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-xs font-extrabold text-red-400 transition"
+          >
+            <Usb size={14} />
+            <span>Arduino UNO Q 🔴 Disconnected (Click to Connect USB)</span>
+          </button>
+        )}
       </div>
 
       {/* ── 2. TOP HARDWARE KPI CARDS ── */}

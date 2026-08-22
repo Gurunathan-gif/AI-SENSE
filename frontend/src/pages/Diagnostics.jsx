@@ -7,13 +7,14 @@ import {
   CheckCircle2, 
   Wrench, 
   RefreshCw, 
-  ArrowRight 
+  ArrowRight, 
+  Usb 
 } from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 import { Link } from "react-router-dom";
 
 export default function Diagnostics() {
-  const { isConnected, hardwareInfo } = useHardware();
+  const { isConnected, hardwareInfo, connectHardwarePort } = useHardware();
 
   return (
     <div className="space-y-6">
@@ -26,10 +27,21 @@ export default function Diagnostics() {
           <p className="text-xs text-gray-400 mt-1">Deep hardware health assessment, communication fidelity, stability &amp; AI anomaly detection</p>
         </div>
 
-        <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs font-bold text-emerald-400">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <span>{isConnected ? (hardwareInfo?.boardName || "Arduino UNO Q") : "Arduino UNO Q"} 🟢 Connected</span>
-        </div>
+        {/* Dynamic Board Connection Status */}
+        {isConnected ? (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping" />
+            <span>{hardwareInfo?.boardName || "Arduino UNO Q"} 🟢 Connected</span>
+          </div>
+        ) : (
+          <button
+            onClick={() => connectHardwarePort()}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-xs font-extrabold text-red-400 transition"
+          >
+            <Usb size={14} />
+            <span>Arduino UNO Q 🔴 Disconnected (Click to Connect USB)</span>
+          </button>
+        )}
       </div>
 
       {/* ── DIAGNOSTIC REPORT CARD ── */}

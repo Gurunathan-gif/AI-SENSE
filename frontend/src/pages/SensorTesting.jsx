@@ -9,7 +9,8 @@ import {
   RefreshCw, 
   ShieldCheck, 
   TrendingUp, 
-  BarChart3 
+  BarChart3, 
+  Usb 
 } from "lucide-react";
 import { useHardware } from "../context/HardwareContext";
 
@@ -23,7 +24,7 @@ const SENSOR_CATALOG = [
 ];
 
 export default function SensorTesting() {
-  const { isConnected, hardwareInfo } = useHardware();
+  const { isConnected, hardwareInfo, connectHardwarePort } = useHardware();
   const [selectedSensorId, setSelectedSensorId] = useState("DHT22");
   const [isTesting, setIsTesting] = useState(true);
   const [showFaultSim, setShowFaultSim] = useState(false);
@@ -56,10 +57,21 @@ export default function SensorTesting() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-950 border border-emerald-500/30 text-xs font-bold text-emerald-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-            <span>{isConnected ? (hardwareInfo?.boardName || "Arduino UNO Q") : "Arduino UNO Q"} 🟢 Connected</span>
-          </div>
+          {/* Dynamic Board Connection Status */}
+          {isConnected ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-xs font-bold text-emerald-400">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>{hardwareInfo?.boardName || "Arduino UNO Q"} 🟢 Connected</span>
+            </div>
+          ) : (
+            <button
+              onClick={() => connectHardwarePort()}
+              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 text-xs font-extrabold text-red-400 transition"
+            >
+              <Usb size={14} />
+              <span>Arduino UNO Q 🔴 Disconnected (Click to Connect USB)</span>
+            </button>
+          )}
 
           <select
             value={selectedSensorId}
