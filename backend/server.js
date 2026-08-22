@@ -2,6 +2,7 @@ import express from "express";
 import { exec, spawn } from "child_process";
 import fs from "fs";
 import path from "path";
+import os from "os";
 import cors from "cors";
 
 const app = express();
@@ -80,7 +81,7 @@ app.get('/api/hardware/status', (req, res) => res.status(200).json({
   grpcDaemon: { active: isDaemonReady, port: 50051 } 
 }));
 
-// Main Source Compilation API Route (gRPC Daemon Engine with 200 OK Fail-Safe)
+// Main Source Compilation API Route (Cross-Platform Localhost Engine)
 app.post('/api/hardware/compile', (req, res) => {
   const userCode = req.body.code;
   if (!userCode) {
@@ -88,8 +89,9 @@ app.post('/api/hardware/compile', (req, res) => {
   }
 
   const buildId = Date.now();
-  const sketchDir = path.join('/tmp', `sketch_${buildId}`);
-  const outputDir = path.join('/tmp', `output_${buildId}`);
+  const tempDir = os.tmpdir();
+  const sketchDir = path.join(tempDir, `sketch_${buildId}`);
+  const outputDir = path.join(tempDir, `output_${buildId}`);
 
   try {
     fs.mkdirSync(sketchDir, { recursive: true });
@@ -97,7 +99,7 @@ app.post('/api/hardware/compile', (req, res) => {
 
     // Single-Threaded Compilation (--jobs 1) with gRPC Daemon memory safety
     const fqbn = req.body.fqbn || "arduino:zephyr:unoq";
-    const cmd = `arduino-cli compile --jobs 1 --fqbn ${fqbn} --output-dir ${outputDir} ${sketchDir}`;
+    const cmd = `arduino-cli compile --jobs 1 --fqbn ${fqbn} --output-dir "${outputDir}" "${sketchDir}"`;
 
     const processThread = exec(cmd, (error, stdout, stderr) => {
       const clearMemory = () => {
