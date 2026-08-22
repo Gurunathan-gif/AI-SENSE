@@ -9,9 +9,11 @@ export const getBaseURL = () => {
     return url.replace(/\/+$/, "");
   }
   
-  if (typeof window !== "undefined" && window.location && window.location.hostname !== "localhost" && window.location.hostname !== "127.0.0.1") {
-    // Direct Vercel Serverless Function Route on same origin
-    return "/api";
+  if (typeof window !== "undefined" && window.location) {
+    const host = window.location.hostname;
+    if (host === "localhost" || host === "127.0.0.1") {
+      return "http://localhost:10000/api";
+    }
   }
   
   return "/api";
@@ -19,7 +21,7 @@ export const getBaseURL = () => {
 
 const api = axios.create({
   baseURL: getBaseURL(),
-  timeout: 45000,
+  timeout: 10000,
 });
 
 api.interceptors.request.use((config) => {

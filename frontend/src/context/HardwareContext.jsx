@@ -50,28 +50,36 @@ export function HardwareProvider({ children }) {
   const [connectionError, setConnectionError] = useState("");
   const [deviceWarning, setDeviceWarning] = useState("");
   const [baudRate, setBaudRate] = useState("115200");
-  const [backendStatus, setBackendStatus] = useState("connected"); // Default to Green Cloud Connected Mode
+  const [backendStatus, setBackendStatus] = useState("checking");
 
   const portRef = useRef(null);
   const readerRef = useRef(null);
 
-  // Ping backend server health check
+  // Ping backend server health check safely
   useEffect(() => {
     const savedMode = localStorage.getItem("aisense_backend_mode");
     if (savedMode === "fallback") {
       setBackendStatus("fallback");
-    } else {
-      setBackendStatus("connected");
     }
 
     const checkBackendHealth = async () => {
       try {
-        const response = await fetch(`${getBaseURL()}/`, { method: "GET" });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        const response = await fetch(`${getBaseURL()}/`, { 
+          method: "GET",
+          signal: controller.signal 
+        });
+        clearTimeout(timeoutId);
+
         if (response.ok) {
           setBackendStatus("connected");
+        } else {
+          setBackendStatus("fallback");
         }
       } catch (e) {
-        // Retain current mode on transient notices
+        // Fall back to Local Mode smoothly if backend server is not running
+        setBackendStatus("fallback");
       }
     };
 
